@@ -41,7 +41,10 @@ class AtomicTopic(BaseModel):
 
 
 class Breakdown(BaseModel):
-    """A structured breakdown of a document into atomic topics."""
+    """A structured breakdown of a document into atomic topics.
+
+    Contains the document title, summary, and list of AtomicTopic objects.
+    """
 
     document_title: str = Field(description="Title of the paper/document")
     document_summary: str = Field(
