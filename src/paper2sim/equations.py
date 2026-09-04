@@ -77,14 +77,14 @@ def extract_equations_from_tex(tex_content: str) -> list[dict]:
 
 
 def _extract_label(text: str, offset: int) -> str | None:
-    """Try to find a \\label{...} near the given position (within ~200 chars)."""
+    """Extract \\label{...} from LaTeX text near a given offset."""
     window = text[max(0, offset - 200) : offset + 200]
     m = re.search(r"\\label\{([^}]+)\}", window)
     return m.group(1) if m else None
 
 
 def _looks_like_math(content: str) -> bool:
-    """Heuristic: does this inline content look like an equation?"""
+    """Heuristic check if inline content looks like math notation."""
     math_ops = r"[=+\-*/<>≤≥≈≠∑∫∏∂∇√∞]|\\(?:frac|sum|int|prod|partial|nabla|sqrt|alpha|beta|gamma|theta|delta|sigma|lambda|omega)"
     return bool(re.search(math_ops, content))
 
@@ -160,7 +160,7 @@ def extract_equations_with_llm(text: str, api_key: str | None = None, model: str
 
 
 def _line_has_math(line: str) -> bool:
-    """Check if a line looks mathematical."""
+    """Check if a line of text contains mathematical notation."""
     # Greek letters or math symbols
     if re.search(r"[αβγδεζηθικλμνξπρστφχψω]", line):
         return True
@@ -284,7 +284,7 @@ def _template_for_type(eq_type: str, latex: str) -> str | None:
 
 
 def _extract_matrix_dims(latex: str) -> tuple[int, int] | None:
-    """Try to extract matrix dimensions from LaTeX."""
+    """Extract (rows, cols) from a LaTeX matrix environment."""
     for env in ("bmatrix", "pmatrix", "vmatrix", "matrix"):
         pattern = rf"\\begin\{{{env}\}}(.*?)\\end\{{{env}\}}"
         m = re.search(pattern, latex, re.DOTALL)
