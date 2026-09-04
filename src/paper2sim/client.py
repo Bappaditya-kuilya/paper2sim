@@ -93,7 +93,7 @@ def _extract_json(text: str) -> str:
 
 
 def _fix_json_strings(text: str) -> str:
-    """Fix common JSON issues: unescaped newlines/tabs inside string values."""
+    """Fix unescaped newlines and tabs inside JSON string values."""
     result = []
     in_string = False
     escape = False
@@ -269,6 +269,7 @@ class Paper2SimAnimationClient:
         self.rendered_videos_path.mkdir(parents=True, exist_ok=True)
 
     def _create_agent(self):
+        """Create a deep agent with Manim coding capabilities."""
         return create_deep_agent(
             model=self.langchain_model,
             system_prompt=MANIM_CODING_AGENT_PROMPT,
@@ -276,6 +277,7 @@ class Paper2SimAnimationClient:
         )
 
     def _prepare_workspace(self):
+        """Clean and prepare the animation workspace for a new render."""
         for item in self.animation_workspace_path.iterdir():
             if item.is_file():
                 item.unlink()
@@ -286,6 +288,7 @@ class Paper2SimAnimationClient:
         scene_file.write_text(SCENE_BOILERPLATE)
 
     def _render_scene(self) -> subprocess.CompletedProcess:
+        """Run Manim to render the current scene.py file."""
         my_env = os.environ.copy()
         my_env["PATH"] = "/Library/TeX/texbin:" + os.environ.get("PATH", "")
         return subprocess.run(
@@ -297,6 +300,7 @@ class Paper2SimAnimationClient:
         )
 
     def _check_render_success(self) -> bool:
+        """Check if Manim produced an MP4 file."""
         # -ql renders to 480p15
         video_dir = self.animation_workspace_path / "media" / "videos" / "scene" / "480p15"
         if not video_dir.exists():
