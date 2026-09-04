@@ -1,3 +1,9 @@
+"""
+Paper2Sim Streamlit UI Entry Point
+
+Main Streamlit application for the Paper2Sim tool that converts academic papers
+into interactive explanations with animated mathematical visualizations.
+"""
 import json
 import tempfile
 import os
@@ -22,7 +28,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Sidebar ---
+# --- Sidebar: Settings and API key input ---
 with st.sidebar:
     st.markdown("## ⚙️ Settings")
     groq_key = st.text_input(
@@ -55,7 +61,7 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# --- Header ---
+# --- Header: App title and description ---
 st.markdown("# 📄 Paper2Sim")
 st.markdown("**AI-powered paper explainer with animated visualizations**")
 st.caption("Paste an arXiv URL or upload a PDF → get structured explanations, animated equations, and an interactive 3D demo.")
@@ -64,7 +70,7 @@ if not groq_key:
     st.warning("Enter your Groq API key in the sidebar to get started.")
     st.stop()
 
-# --- Input ---
+# --- Input: arXiv URL or PDF upload ---
 col_input, col_action = st.columns([3, 1])
 with col_input:
     arxiv_url = st.text_input(
@@ -175,7 +181,7 @@ elif st.session_state.breakdown:
     st.markdown(f"### {b.document_title}")
     st.write(b.document_summary)
 
-# --- Equations ---
+# --- Equations: Extracted equations display and template mapping ---
 if st.session_state.equations:
     st.markdown("---")
     st.markdown("### 📐 Extracted Equations")
@@ -213,7 +219,7 @@ if st.session_state.equations:
             else:
                 st.warning("No equations matched available templates")
 
-    # --- Render Animations ---
+    # --- Render: Animation generation and video playback ---
     if st.session_state.equation_mappings:
         st.markdown("### 🎥 Render Animations")
 
@@ -267,7 +273,7 @@ if st.session_state.equations:
             progress.empty()
             st.rerun()
 
-# --- 3D Sandbox ---
+# --- 3D Sandbox: Interactive mathematical surface exploration ---
 if os.path.exists("threejs_demo/index.html"):
     st.markdown("---")
     st.markdown("### 🌐 Interactive 3D Sandbox")
