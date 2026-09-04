@@ -1,4 +1,8 @@
-"""arXiv paper downloader and source TeX extractor."""
+"""arXiv paper downloader and source TeX extractor.
+
+Provides utilities to parse arXiv URLs, download PDFs and TeX sources,
+and fetch paper metadata from the arXiv Atom API.
+"""
 
 import io
 import re
