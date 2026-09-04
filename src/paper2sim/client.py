@@ -310,6 +310,7 @@ class Paper2SimAnimationClient:
         return len(list(video_dir.glob("*.mp4"))) > 0
 
     def _get_video_path(self) -> pathlib.Path | None:
+        """Return the path to the first rendered MP4 video, or None if not found."""
         # -ql renders to 480p15
         video_dir = self.animation_workspace_path / "media" / "videos" / "scene" / "480p15"
         if video_dir.exists():
@@ -324,6 +325,7 @@ class Paper2SimAnimationClient:
         return None
 
     def _sanitize_filename(self, name: str) -> str:
+        """Sanitize a string for use as a filename by removing special characters."""
         sanitized = name.replace(" ", "_")
         sanitized = re.sub(r"[^\w\-]", "", sanitized)
         return sanitized[:50].lower()
