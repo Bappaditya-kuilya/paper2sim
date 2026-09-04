@@ -143,7 +143,7 @@ class Paper2SimBreakdownClient:
         self,
         file_path: str | pathlib.Path,
         model: str = "openai/gpt-oss-120b",
-    ) -> tuple[Breakdown | None, str]:
+    ) -> tuple[Breakdown, str] | tuple[None, str]:
         """Break down a PDF document into atomic, self-contained topics.
 
         Args:
