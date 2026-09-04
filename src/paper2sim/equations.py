@@ -1,4 +1,8 @@
-"""Equation extraction from LaTeX source or plain text."""
+"""Equation extraction from LaTeX source or plain text.
+
+Provides functions to extract equations from TeX files, PDF text, or via LLM,
+classify them by type, and map to appropriate Manim animation templates.
+"""
 
 import json
 import os
