@@ -197,6 +197,7 @@ if st.session_state.equations:
                 st.caption(f"Type: {eq.get('type', 'unknown')} · Template: {template}")
 
     # --- Template Mapping ---
+    # --- Equations: Display extracted equations with template mapping ---
     st.markdown("### 🎬 Map to Animations")
     if st.button("Map Equations to Templates", type="primary"):
         with st.spinner("Mapping equations to animation templates..."):
