@@ -96,7 +96,15 @@ def _extract_tar_gz(data: bytes, dest: Path) -> Path | None:
 
 
 def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
-    """Save raw bytes as .tex file."""
+    """Save raw bytes as .tex file.
+
+    Args:
+        data: Raw bytes from arXiv e-print endpoint.
+        dest: Destination directory.
+
+    Returns:
+        Path to saved .tex file, or None if decoding fails.
+    """
     try:
         text = data.decode("utf-8", errors="replace")
     except Exception:
