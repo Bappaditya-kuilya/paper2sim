@@ -46,7 +46,14 @@ PALETTE = [BLUE, GREEN, YELLOW, RED, WHITE]
 
 
 def _make_scene(construct_fn: Callable) -> type[Scene]:
-    """Wrap a construct function into a Scene subclass."""
+    """Wrap a construct function into a Scene subclass.
+
+    Args:
+        construct_fn: A callable that takes a Scene instance and runs the animation.
+
+    Returns:
+        A Scene subclass with the construct method implemented.
+    """
 
     class _Scene(Scene):
         def construct(self):
