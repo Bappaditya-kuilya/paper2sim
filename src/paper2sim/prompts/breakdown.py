@@ -1,4 +1,8 @@
-"""Breakdown prompt for document analysis."""
+"""Breakdown prompt for document analysis.
+
+System prompt that instructs the LLM to break academic papers into
+atomic topics suitable for standalone educational videos.
+"""
 
 BREAKDOWN_PROMPT = """You are an expert at breaking academic papers into atomic topics for 5-minute educational videos.
 
