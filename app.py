@@ -239,7 +239,8 @@ if st.session_state.equations:
                     st.success("✓ Rendered")
                 elif st.button("Render", key=f"render_{idx}_{template_name}"):
                     with st.spinner(f"Rendering {template_name}..."):
-                        out_dir = Path("rendered_videos")
+# --- Render: Generate Manim animations for each mapped equation ---
+            out_dir = Path("rendered_videos")
                         out_dir.mkdir(exist_ok=True)
                         out_path = out_dir / f"{video_key}.mp4"
 
