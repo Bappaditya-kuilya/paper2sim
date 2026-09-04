@@ -1,4 +1,8 @@
-"""Paper2Sim clients for document processing and animation generation."""
+"""Paper2Sim clients for document processing and animation generation.
+
+Provides Paper2SimBreakdownClient for Groq API-based document analysis
+and Paper2SimAnimationClient for LLM-driven Manim code generation.
+"""
 
 import copy
 import json
