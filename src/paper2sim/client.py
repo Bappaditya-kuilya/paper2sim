@@ -26,7 +26,14 @@ from paper2sim.prompts.breakdown import BREAKDOWN_PROMPT
 
 
 def _extract_pdf_text(file_path: pathlib.Path) -> str:
-    """Extract text from a PDF using PyMuPDF."""
+    """Extract text from a PDF using PyMuPDF.
+
+    Args:
+        file_path: Path to the PDF file.
+
+    Returns:
+        Extracted text with double newlines between pages.
+    """
     import pymupdf
 
     doc = pymupdf.open(str(file_path))
