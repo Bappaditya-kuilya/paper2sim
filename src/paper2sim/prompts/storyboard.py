@@ -1,4 +1,7 @@
-"""Storyboard prompt for transforming atomic topics into visual animation stories."""
+"""Storyboard prompt for transforming atomic topics into visual animation stories.
+
+Generates 3Blue1Brown-style visual storyboards with narration for Manim rendering.
+"""
 
 STORYBOARD_PROMPT = """You are an expert educational animator in the style of 3Blue1Brown.
 Your task is to transform an atomic topic into a **visual storyboard with narration** - a clear 
