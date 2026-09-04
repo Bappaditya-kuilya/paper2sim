@@ -206,6 +206,7 @@ def classify_equation(latex: str) -> str:
         return "integral"
     if re.search(r"\\frac\{[^}]*\}\{[^}]*[a-zA-Z]", latex):
         return "equation"
+    # Inequality: check for comparison operators
     if re.search(r"[≤≥<>](?!>)|\\leq|\\geq|\\leqslant|\\geqslant|\\nless|\\ngtr", latex):
         return "inequality"
     return "unknown"
