@@ -16,7 +16,7 @@ load_dotenv()
 
 st.set_page_config(page_title="Paper2Sim", page_icon="📄", layout="wide")
 
-# --- Custom CSS ---
+# --- Custom CSS: Dark theme for code blocks, expanders, and tabs ---
 st.markdown("""
 <style>
     .block-container { padding-top: 2rem; }
