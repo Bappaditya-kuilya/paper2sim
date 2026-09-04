@@ -91,7 +91,10 @@ class Scene(BaseModel):
 
 
 class TopicStoryboard(BaseModel):
-    """A complete visual storyboard for one atomic topic - a filmmaker's screenplay."""
+    """A complete visual storyboard for one atomic topic - a filmmaker's screenplay.
+
+    Contains the topic name, overarching visual concept, and ordered list of scenes.
+    """
 
     topic_name: str = Field(description="Name of the atomic topic being visualized")
     visual_concept: str = Field(
