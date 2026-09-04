@@ -56,7 +56,10 @@ class Breakdown(BaseModel):
 
 
 class Scene(BaseModel):
-    """A single scene in the storyboard - a complete visual and audio sequence."""
+    """A single scene in the storyboard - a complete visual and audio sequence.
+
+    Each scene has a type (hook/mid/closing), title, visual description, and narration.
+    """
 
     scene_type: Literal["hook", "mid", "closing"] = Field(
         default="mid",
