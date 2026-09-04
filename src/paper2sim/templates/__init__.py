@@ -663,8 +663,8 @@ TEMPLATES: dict[str, Callable] = {
 }
 
 
-def render_template(template_name: str, params: dict, output_path: str) -> bool:
-    """Render a template to MP4. Returns True on success."""
+def render_template(template_name: str, params: dict, output_path: str) -> Path:
+    """Render a named template to an MP4 video using Manim."""
     if template_name not in TEMPLATES:
         print(f"Unknown template: {template_name}. Available: {list(TEMPLATES.keys())}")
         return False
