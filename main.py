@@ -1,5 +1,5 @@
 def main():
-    print("Hello from eduly!")
+    print("Hello from paper2sim!")
 
 
 if __name__ == "__main__":
