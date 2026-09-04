@@ -42,6 +42,7 @@ ORANGE = "#FF8C00"
 PURPLE = "#9B59B6"
 TEAL = "#1ABC9C"
 
+# Color palette for template visualizations - distinct colors for different elements
 PALETTE = [BLUE, GREEN, YELLOW, RED, WHITE]
 
 
