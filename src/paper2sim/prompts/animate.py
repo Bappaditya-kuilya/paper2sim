@@ -4,6 +4,7 @@ Contains the system prompt for the Manim coding agent, scene boilerplate templat
 and the function to format storyboard prompts for LLM input.
 """
 
+# System prompt for Manim coding agent - generates scene.py from storyboards
 MANIM_CODING_AGENT_PROMPT = """You are an Expert Manim Animator creating detailed educational videos with access to documentation and a workspace.
 
 ## Your Goal
