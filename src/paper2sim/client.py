@@ -1,4 +1,8 @@
-"""Paper2Sim clients for document processing and animation generation."""
+"""Paper2Sim clients for document processing and animation generation.
+
+Provides Paper2SimBreakdownClient for Groq API-based document analysis
+and Paper2SimAnimationClient for LLM-driven Manim code generation.
+"""
 
 import copy
 import json
@@ -26,8 +30,15 @@ from paper2sim.prompts.breakdown import BREAKDOWN_PROMPT
 
 
 def _extract_pdf_text(file_path: pathlib.Path) -> str:
-    """Extract text from a PDF using PyMuPDF."""
-    import pymupdf
+    """Extract text from a PDF using PyMuPDF.
+
+    Args:
+        file_path: Path to the PDF file.
+
+    Returns:
+        Extracted text with double newlines between pages.
+    """
+    import pymupdf  # type: ignore[import]
 
     doc = pymupdf.open(str(file_path))
     text_parts = []
@@ -38,7 +49,10 @@ def _extract_pdf_text(file_path: pathlib.Path) -> str:
 
 
 def _extract_json(text: str) -> str:
-    """Extract JSON from a response that may contain markdown fences, thinking blocks, and bold formatting."""
+    """Extract JSON from a response that may contain markdown fences, thinking blocks, and bold formatting.
+
+    Handles: <think> blocks, **bold**, ```json fences, and raw JSON with brace tracking.
+    """
     # Strip thinking blocks
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     # Strip markdown bold
@@ -79,7 +93,7 @@ def _extract_json(text: str) -> str:
 
 
 def _fix_json_strings(text: str) -> str:
-    """Fix common JSON issues: unescaped newlines/tabs inside string values."""
+    """Fix unescaped newlines and tabs inside JSON string values."""
     result = []
     in_string = False
     escape = False
@@ -255,6 +269,7 @@ class Paper2SimAnimationClient:
         self.rendered_videos_path.mkdir(parents=True, exist_ok=True)
 
     def _create_agent(self):
+        """Create a deep agent with Manim coding capabilities."""
         return create_deep_agent(
             model=self.langchain_model,
             system_prompt=MANIM_CODING_AGENT_PROMPT,
@@ -262,6 +277,7 @@ class Paper2SimAnimationClient:
         )
 
     def _prepare_workspace(self):
+        """Clean and prepare the animation workspace for a new render."""
         for item in self.animation_workspace_path.iterdir():
             if item.is_file():
                 item.unlink()
@@ -272,6 +288,7 @@ class Paper2SimAnimationClient:
         scene_file.write_text(SCENE_BOILERPLATE)
 
     def _render_scene(self) -> subprocess.CompletedProcess:
+        """Run Manim to render the current scene.py file."""
         my_env = os.environ.copy()
         my_env["PATH"] = "/Library/TeX/texbin:" + os.environ.get("PATH", "")
         return subprocess.run(
@@ -283,6 +300,7 @@ class Paper2SimAnimationClient:
         )
 
     def _check_render_success(self) -> bool:
+        """Check if Manim produced an MP4 file."""
         # -ql renders to 480p15
         video_dir = self.animation_workspace_path / "media" / "videos" / "scene" / "480p15"
         if not video_dir.exists():
@@ -292,6 +310,7 @@ class Paper2SimAnimationClient:
         return len(list(video_dir.glob("*.mp4"))) > 0
 
     def _get_video_path(self) -> pathlib.Path | None:
+        """Return the path to the first rendered MP4 video, or None if not found."""
         # -ql renders to 480p15
         video_dir = self.animation_workspace_path / "media" / "videos" / "scene" / "480p15"
         if video_dir.exists():
@@ -306,6 +325,7 @@ class Paper2SimAnimationClient:
         return None
 
     def _sanitize_filename(self, name: str) -> str:
+        """Sanitize a string for use as a filename by removing special characters."""
         sanitized = name.replace(" ", "_")
         sanitized = re.sub(r"[^\w\-]", "", sanitized)
         return sanitized[:50].lower()
