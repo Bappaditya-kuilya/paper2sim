@@ -1,4 +1,8 @@
-"""Prompts for mapping equations to Manim templates."""
+"""Prompts for mapping equations to Manim templates.
+
+Provides the LLM prompt that classifies equations and selects
+the best matching animation template with parameters.
+"""
 
 MAPPING_PROMPT = """You are a math visualization expert. Given a list of equations extracted from a research paper, map each equation to the most appropriate animation template.
 
