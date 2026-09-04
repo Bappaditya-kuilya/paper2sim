@@ -169,7 +169,11 @@ def _line_has_math(line: str) -> bool:
 
 
 def _is_garbage(text: str) -> bool:
-    """Filter out garbled/corrupted text that isn't real LaTeX."""
+    """Filter out garbled/corrupted text that isn't real LaTeX.
+
+    Catches: too short, mostly non-ASCII (corrupted PDF Unicode),
+    or no recognizable math characters.
+    """
     if len(text.strip()) < 3:
         return True
     # Count non-ASCII characters — if >10% of the string, it's garbage
@@ -177,7 +181,7 @@ def _is_garbage(text: str) -> bool:
     if len(text) > 0 and non_ascii / len(text) > 0.1:
         return True
     # Must contain at least one ASCII letter or common LaTeX char
-    if not re.search(r"[a-zA-Z0-9=+\-*/^\\{}()]", text):
+    if not re.search(r'[a-zA-Z=+\-*/^_{}\\]', text):
         return True
     return False
 
