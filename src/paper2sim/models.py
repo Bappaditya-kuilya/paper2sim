@@ -1,4 +1,8 @@
-"""Pydantic models for document breakdown and storyboard generation."""
+"""Pydantic models for document breakdown and storyboard generation.
+
+These models define the structured output format for LLM responses and
+provide validation via Pydantic's type system.
+"""
 
 import pathlib
 from typing import Literal
