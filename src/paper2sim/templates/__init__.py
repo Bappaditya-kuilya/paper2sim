@@ -46,7 +46,14 @@ PALETTE = [BLUE, GREEN, YELLOW, RED, WHITE]
 
 
 def _make_scene(construct_fn: Callable) -> type[Scene]:
-    """Wrap a construct function into a Scene subclass."""
+    """Wrap a construct function into a Scene subclass.
+
+    Args:
+        construct_fn: A callable that takes a Scene instance and runs the animation.
+
+    Returns:
+        A Scene subclass with the construct method implemented.
+    """
 
     class _Scene(Scene):
         def construct(self):
@@ -656,8 +663,8 @@ TEMPLATES: dict[str, Callable] = {
 }
 
 
-def render_template(template_name: str, params: dict, output_path: str) -> bool:
-    """Render a template to MP4. Returns True on success."""
+def render_template(template_name: str, params: dict, output_path: str) -> Path:
+    """Render a named template to an MP4 video using Manim."""
     if template_name not in TEMPLATES:
         print(f"Unknown template: {template_name}. Available: {list(TEMPLATES.keys())}")
         return False
