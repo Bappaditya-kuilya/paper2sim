@@ -22,7 +22,7 @@ Focus on the 5-10 most important equations. Return ONLY valid JSON, no markdown.
 
 
 
-def extract_equations_from_tex(tex_content: str) -> list[dict]:
+def extract_equations_from_tex(tex_content: str) -> list[dict[str, str]]:
     """Extract equations from LaTeX source.
 
     Finds display equations (\\begin{equation}.., \\[.., $$..$$) and
@@ -89,7 +89,7 @@ def _looks_like_math(content: str) -> bool:
     return bool(re.search(math_ops, content))
 
 
-def extract_equations_from_text(text: str) -> list[dict]:
+def extract_equations_from_text(text: str) -> list[dict[str, str]]:
     """Fallback extraction from plain text (e.g. PDF output).
 
     Looks for lines with math operators, Greek letters, or symbols.
@@ -109,7 +109,7 @@ def extract_equations_from_text(text: str) -> list[dict]:
     return equations
 
 
-def extract_equations_with_llm(text: str, api_key: str | None = None, model: str = "openai/gpt-oss-120b") -> list[dict]:
+def extract_equations_with_llm(text: str, api_key: str | None = None, model: str = "openai/gpt-oss-120b") -> list[dict[str, str | dict]]:
     """Use LLM to extract equations from plain text (PDF fallback).
 
     Args:
@@ -191,7 +191,10 @@ def _is_garbage(text: str) -> bool:
 
 
 def classify_equation(latex: str) -> str:
-    """Classify equation by type using keyword matching."""
+    """Classify equation by type using keyword matching.
+
+    Returns one of: function_def, matrix, sum, integral, equation, inequality, unknown
+    """
     # Specific patterns FIRST (before generic \frac catch-all)
     if re.search(r"(?:attention|multihead|softmax|\\operatorname\{softmax\})", latex, re.IGNORECASE):
         return "function_def"
@@ -216,7 +219,7 @@ def classify_equation(latex: str) -> str:
     return "unknown"
 
 
-def select_templates(equations: list[dict]) -> list[dict]:
+def select_templates(equations: list[dict[str, str]]) -> list[dict[str, str | dict]]:
     """Map equations to Manim template names."""
     results = []
     for eq in equations:
