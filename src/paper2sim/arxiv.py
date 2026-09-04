@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def parse_arxiv_url(url: str) -> str | None:
-    """Extract arXiv ID from URL or bare ID string.
+    """Extract arXiv ID from various URL formats.
 
     Handles:
     - https://arxiv.org/abs/2301.12345
