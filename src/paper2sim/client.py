@@ -45,7 +45,10 @@ def _extract_pdf_text(file_path: pathlib.Path) -> str:
 
 
 def _extract_json(text: str) -> str:
-    """Extract JSON from a response that may contain markdown fences, thinking blocks, and bold formatting."""
+    """Extract JSON from a response that may contain markdown fences, thinking blocks, and bold formatting.
+
+    Handles: <think> blocks, **bold**, ```json fences, and raw JSON with brace tracking.
+    """
     # Strip thinking blocks
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     # Strip markdown bold
