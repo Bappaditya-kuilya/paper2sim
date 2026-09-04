@@ -42,6 +42,7 @@ ORANGE = "#FF8C00"
 PURPLE = "#9B59B6"
 TEAL = "#1ABC9C"
 
+# Color palette for template visualizations - distinct colors for different elements
 PALETTE = [BLUE, GREEN, YELLOW, RED, WHITE]
 
 
@@ -74,6 +75,7 @@ def _tex(text: str, **kwargs) -> Text:
 # ---------------------------------------------------------------------------
 
 def matrix_multiply(m: int = 2, n: int = 3, p: int = 2, title: str = "Matrix Multiplication") -> type[Scene]:
+    """Template: matrix_multiply - Matrix multiplication visualization A(m×n) × B(n×p) = C(m×p)."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -120,6 +122,7 @@ def matrix_multiply(m: int = 2, n: int = 3, p: int = 2, title: str = "Matrix Mul
 # ---------------------------------------------------------------------------
 
 def attention_heatmap(seq_len: int = 8, head_dim: int = 16, title: str = "Attention Scores") -> type[Scene]:
+    """Template: attention_heatmap - Self-attention score heatmap showing Q×K^T similarity matrix."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -165,6 +168,7 @@ def attention_heatmap(seq_len: int = 8, head_dim: int = 16, title: str = "Attent
 # ---------------------------------------------------------------------------
 
 def gradient_descent(loss_fn: str = "quadratic", steps: int = 10, learning_rate: float = 0.1, title: str = "Gradient Descent") -> type[Scene]:
+    """Template: gradient_descent - Gradient descent optimization on a loss surface with step visualization."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -215,6 +219,7 @@ def gradient_descent(loss_fn: str = "quadratic", steps: int = 10, learning_rate:
 # ---------------------------------------------------------------------------
 
 def convolution_1d(signal_len: int = 10, kernel_size: int = 3, title: str = "1D Convolution") -> type[Scene]:
+    """Template: convolution_1d - 1D convolution sliding kernel over signal with output computation."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -290,6 +295,7 @@ def convolution_1d(signal_len: int = 10, kernel_size: int = 3, title: str = "1D 
 # ---------------------------------------------------------------------------
 
 def softmax_distribution(values: list[float] | None = None, title: str = "Softmax") -> type[Scene]:
+    """Template: softmax_distribution - Softmax probability distribution from logits with bar chart."""
     if values is None:
         values = [2.0, 1.0, 0.1]
 
@@ -351,6 +357,7 @@ def softmax_distribution(values: list[float] | None = None, title: str = "Softma
 # ---------------------------------------------------------------------------
 
 def embedding_lookup(vocab_size: int = 10, embed_dim: int = 4, title: str = "Embedding Lookup") -> type[Scene]:
+    """Template: embedding_lookup - Embedding table lookup showing word-to-vector retrieval."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -420,6 +427,7 @@ def embedding_lookup(vocab_size: int = 10, embed_dim: int = 4, title: str = "Emb
 # ---------------------------------------------------------------------------
 
 def loss_landscape(loss_type: str = "mse", title: str = "Loss Function") -> type[Scene]:
+    """Template: loss_landscape - Loss function landscape (MSE or cross-entropy) with gradient descent path."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -471,6 +479,7 @@ def loss_landscape(loss_type: str = "mse", title: str = "Loss Function") -> type
 # ---------------------------------------------------------------------------
 
 def transformer_block(title: str = "Transformer Block") -> type[Scene]:
+    """Template: transformer_block - Transformer encoder block with attention, FFN, and skip connections."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -544,6 +553,7 @@ def linear_combination(
     weights: list[float] | None = None,
     title: str = "Linear Combination",
 ) -> type[Scene]:
+    """Template: linear_combination - Weighted sum of vectors Σ wᵢvᵢ with geometric visualization."""
     if vectors is None:
         vectors = [(2, 1), (1, 2)]
     if weights is None:
@@ -601,6 +611,7 @@ def linear_combination(
 # ---------------------------------------------------------------------------
 
 def probability_distribution(dist_type: str = "gaussian", title: str = "Probability Distribution") -> type[Scene]:
+    """Template: probability_distribution - Probability density (Gaussian or Uniform) with random sampling."""
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))

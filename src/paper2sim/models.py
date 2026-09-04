@@ -1,4 +1,8 @@
-"""Pydantic models for document breakdown and storyboard generation."""
+"""Pydantic models for document breakdown and storyboard generation.
+
+These models define the structured output format for LLM responses and
+provide validation via Pydantic's type system.
+"""
 
 import pathlib
 from typing import Literal
@@ -7,7 +11,10 @@ from pydantic import BaseModel, Field
 
 
 class AtomicTopic(BaseModel):
-    """A self-contained topic extracted from a document."""
+    """A self-contained topic extracted from a document.
+
+    Each topic represents one atomic concept suitable for a ~5 minute video.
+    """
 
     name: str = Field(
         description="A clear, descriptive heading for this topic (e.g., 'Self-Attention Mechanism', 'Positional Encoding')"
@@ -34,7 +41,10 @@ class AtomicTopic(BaseModel):
 
 
 class Breakdown(BaseModel):
-    """A structured breakdown of a document into atomic topics."""
+    """A structured breakdown of a document into atomic topics.
+
+    Contains the document title, summary, and list of AtomicTopic objects.
+    """
 
     document_title: str = Field(description="Title of the paper/document")
     document_summary: str = Field(
@@ -46,7 +56,10 @@ class Breakdown(BaseModel):
 
 
 class Scene(BaseModel):
-    """A single scene in the storyboard - a complete visual and audio sequence."""
+    """A single scene in the storyboard - a complete visual and audio sequence.
+
+    Each scene has a type (hook/mid/closing), title, visual description, and narration.
+    """
 
     scene_type: Literal["hook", "mid", "closing"] = Field(
         default="mid",
@@ -78,7 +91,10 @@ class Scene(BaseModel):
 
 
 class TopicStoryboard(BaseModel):
-    """A complete visual storyboard for one atomic topic - a filmmaker's screenplay."""
+    """A complete visual storyboard for one atomic topic - a filmmaker's screenplay.
+
+    Contains the topic name, overarching visual concept, and ordered list of scenes.
+    """
 
     topic_name: str = Field(description="Name of the atomic topic being visualized")
     visual_concept: str = Field(

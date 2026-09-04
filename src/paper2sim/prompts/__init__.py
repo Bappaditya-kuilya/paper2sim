@@ -1,4 +1,7 @@
-"""Prompts for Paper2Sim document processing."""
+"""Prompts for Paper2Sim document processing.
+
+Re-exports all prompt constants and formatting functions for easy access.
+"""
 
 from paper2sim.prompts.animate import (
     MANIM_CODING_AGENT_PROMPT,

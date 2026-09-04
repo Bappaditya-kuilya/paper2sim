@@ -234,7 +234,11 @@ def select_templates(equations: list[dict[str, str]]) -> list[dict[str, str | di
 
 
 def _template_for_type(eq_type: str, latex: str) -> str | None:
-    """Select a template based on equation type and content."""
+    """Select a template based on equation type and content.
+
+    Priority order: attention/multihead/layernorm/embedding first,
+    then structural patterns (sum, integral, matrix), then generic.
+    """
     if eq_type == "matrix":
         dims = _extract_matrix_dims(latex)
         if dims:

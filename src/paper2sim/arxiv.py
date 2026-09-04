@@ -1,4 +1,8 @@
-"""arXiv paper downloader and source TeX extractor."""
+"""arXiv paper downloader and source TeX extractor.
+
+Provides utilities to parse arXiv URLs, download PDFs and TeX sources,
+and fetch paper metadata from the arXiv Atom API.
+"""
 
 import io
 import re
@@ -11,7 +15,7 @@ from pathlib import Path
 
 
 def parse_arxiv_url(url: str) -> str | None:
-    """Extract arXiv ID from URL or bare ID string.
+    """Extract arXiv ID from various URL formats.
 
     Handles:
     - https://arxiv.org/abs/2301.12345
@@ -32,7 +36,7 @@ def parse_arxiv_url(url: str) -> str | None:
 
 
 def download_pdf(arxiv_id: str, dest_dir: str) -> Path | None:
-    """Download PDF from arXiv. Returns path or None on failure."""
+    """Download the PDF for an arXiv paper to a local directory."""
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
     url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
@@ -45,11 +49,7 @@ def download_pdf(arxiv_id: str, dest_dir: str) -> Path | None:
 
 
 def download_source(arxiv_id: str, dest_dir: str) -> Path | None:
-    """Download source TeX from arXiv and extract .tex files.
-
-    The source arrives as tar.gz from /e-print/. If the response is a plain
-    .tex file, it is saved directly. Returns the path to the main .tex file.
-    """
+    """Download and extract the TeX source for an arXiv paper."""
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
     url = f"https://arxiv.org/e-print/{arxiv_id}"
@@ -70,7 +70,7 @@ def download_source(arxiv_id: str, dest_dir: str) -> Path | None:
 
 
 def _extract_tar_gz(data: bytes, dest: Path) -> Path | None:
-    """Extract .tex files from tar.gz bytes. Return the main .tex file."""
+    """Extract .tex files from a tar.gz archive with path traversal protection."""
     tex_files: list[Path] = []
     dest_resolved = dest.resolve()
     try:
@@ -96,7 +96,15 @@ def _extract_tar_gz(data: bytes, dest: Path) -> Path | None:
 
 
 def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
-    """Save raw bytes as .tex file."""
+    """Save raw bytes as .tex file.
+
+    Args:
+        data: Raw bytes from arXiv e-print endpoint.
+        dest: Destination directory.
+
+    Returns:
+        Path to saved .tex file, or None if decoding fails.
+    """
     try:
         text = data.decode("utf-8", errors="replace")
     except Exception:
@@ -107,10 +115,7 @@ def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
 
 
 def get_paper_info(arxiv_id: str) -> dict | None:
-    """Fetch paper metadata from the arXiv API.
-
-    Returns dict with keys: title, authors, abstract. None on failure.
-    """
+    """Fetch paper metadata from the arXiv Atom API."""
     url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "paper2sim/0.1"})
