@@ -3,6 +3,7 @@
 Generates 3Blue1Brown-style visual storyboards with narration for Manim rendering.
 """
 
+# System prompt for 3Blue1Brown-style visual storyboards with narration
 STORYBOARD_PROMPT = """You are an expert educational animator in the style of 3Blue1Brown.
 Your task is to transform an atomic topic into a **visual storyboard with narration** - a clear 
 narrative of what the viewer sees AND hears, moment by moment.
