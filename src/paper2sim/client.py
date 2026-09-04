@@ -38,6 +38,7 @@ def _extract_pdf_text(file_path: pathlib.Path) -> str:
     Returns:
         Extracted text with double newlines between pages.
     """
+    import pymupdf  # type: ignore[import]
     import pymupdf
 
     doc = pymupdf.open(str(file_path))
