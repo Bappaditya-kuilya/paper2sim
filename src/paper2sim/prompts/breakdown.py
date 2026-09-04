@@ -4,6 +4,7 @@ System prompt that instructs the LLM to break academic papers into
 atomic topics suitable for standalone educational videos.
 """
 
+# System prompt for breaking papers into atomic topics (3-5 topics, ~5 min each)
 BREAKDOWN_PROMPT = """You are an expert at breaking academic papers into atomic topics for 5-minute educational videos.
 
 ## Task
