@@ -191,7 +191,10 @@ def _is_garbage(text: str) -> bool:
 
 
 def classify_equation(latex: str) -> str:
-    """Classify equation by type using keyword matching."""
+    """Classify equation by type using keyword matching.
+
+    Returns one of: function_def, matrix, sum, integral, equation, inequality, unknown
+    """
     # Specific patterns FIRST (before generic \frac catch-all)
     if re.search(r"(?:attention|multihead|softmax|\\operatorname\{softmax\})", latex, re.IGNORECASE):
         return "function_def"
@@ -216,7 +219,7 @@ def classify_equation(latex: str) -> str:
     return "unknown"
 
 
-def select_templates(equations: list[dict]) -> list[dict]:
+def select_templates(equations: list[dict[str, str]]) -> list[dict[str, str | dict]]:
     """Map equations to Manim template names."""
     results = []
     for eq in equations:
