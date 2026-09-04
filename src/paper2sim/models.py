@@ -11,7 +11,10 @@ from pydantic import BaseModel, Field
 
 
 class AtomicTopic(BaseModel):
-    """A self-contained topic extracted from a document."""
+    """A self-contained topic extracted from a document.
+
+    Each topic represents one atomic concept suitable for a ~5 minute video.
+    """
 
     name: str = Field(
         description="A clear, descriptive heading for this topic (e.g., 'Self-Attention Mechanism', 'Positional Encoding')"
