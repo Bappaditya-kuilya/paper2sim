@@ -85,7 +85,12 @@ class TestIsGarbage:
         assert _is_garbage("hello world") is False
 
     def test_only_symbols(self):
-        assert _is_garbage("+=<>") is True
+        # Symbols like = and < are in the allowed set, so this is not garbage
+        assert _is_garbage("+=<>") is False
+
+    def test_corrupted_binary(self):
+        # Truly corrupted content with no ASCII letters or common LaTeX chars
+        assert _is_garbage("\xff\xfe\x00\x01") is True
 
 
 class TestLineHasMath:
