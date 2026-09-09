@@ -242,3 +242,8 @@ agent_workspace/
 
 # Streamlit config (has server settings)
 .streamlit/
+
+# Planning docs (local only)
+text.md
+plan.md
+.scratch/
