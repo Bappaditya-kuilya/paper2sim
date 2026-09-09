@@ -45,8 +45,8 @@ with st.sidebar:
     st.divider()
     st.markdown("### Links")
     st.markdown("[📖 GitHub](https://github.com)", unsafe_allow_html=True)
-    if os.path.exists("threejs_demo/index.html"):
-        st.markdown("[🌐 3D Sandbox](threejs_demo/index.html)", unsafe_allow_html=True)
+    if os.path.exists("static/threejs_demo/index.html"):
+        st.markdown("[🌐 3D Sandbox](static/threejs_demo/index.html)", unsafe_allow_html=True)
 
 # --- Session State ---
 defaults = {
@@ -275,7 +275,7 @@ if st.session_state.equations:
             st.rerun()
 
 # --- 3D Sandbox: Interactive mathematical surface exploration ---
-if os.path.exists("threejs_demo/index.html"):
+if os.path.exists("static/threejs_demo/index.html"):
     st.markdown("---")
     st.markdown("### 🌐 Interactive 3D Sandbox")
     st.caption("Explore mathematical surfaces with real-time parameter controls")
