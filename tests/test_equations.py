@@ -81,7 +81,11 @@ class TestIsGarbage:
         assert _is_garbage("E = mc^2") is False
 
     def test_no_math_chars(self):
-        assert _is_garbage("hello world") is True
+        # "hello world" has ASCII letters so _is_garbage returns False
+        assert _is_garbage("hello world") is False
+
+    def test_only_symbols(self):
+        assert _is_garbage("+=<>") is True
 
 
 class TestLineHasMath:

@@ -103,11 +103,15 @@ def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
         dest: Destination directory.
 
     Returns:
-        Path to saved .tex file, or None if decoding fails.
+        Path to saved .tex file, or None if decoding fails or data is empty.
     """
+    if not data:
+        return None
     try:
         text = data.decode("utf-8", errors="replace")
     except Exception:
+        return None
+    if not text.strip():
         return None
     out = dest / "source.tex"
     out.write_text(text)
