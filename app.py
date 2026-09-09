@@ -290,7 +290,7 @@ if os.path.exists("threejs_demo/index.html"):
         # Pass equations as URL params to the static HTML file
         import base64
         eq_json = base64.b64encode(json.dumps(paper_eqs).encode()).decode()
-        demo_url = f"/app/static/threejs_demo/index.html?equations_b64={eq_json}"
+        demo_url = f"/static/threejs_demo/index.html?equations_b64={eq_json}"
         st.iframe(demo_url, height=600)
     except Exception as e:
         st.error(f"3D Sandbox error: {e}")
