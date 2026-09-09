@@ -289,8 +289,11 @@ class Paper2SimAnimationClient:
 
     def _render_scene(self) -> subprocess.CompletedProcess:
         """Run Manim to render the current scene.py file."""
+        import platform
+
         my_env = os.environ.copy()
-        my_env["PATH"] = "/Library/TeX/texbin:" + os.environ.get("PATH", "")
+        if platform.system() == "Darwin":
+            my_env["PATH"] = "/Library/TeX/texbin:" + my_env.get("PATH", "")
         return subprocess.run(
             ["uv", "run", "manim", "-ql", "scene.py"],
             capture_output=True,
