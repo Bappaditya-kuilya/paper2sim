@@ -5,6 +5,8 @@ Each template is a factory function that returns a Manim Scene class
 parameterized by the given arguments. No LLM code generation needed.
 """
 
+import inspect
+import logging
 import math
 import shutil
 from pathlib import Path
@@ -41,6 +43,8 @@ GREEN = "#58C4DD"
 ORANGE = "#FF8C00"
 PURPLE = "#9B59B6"
 TEAL = "#1ABC9C"
+
+logger = logging.getLogger(__name__)
 
 # Color palette for template visualizations - distinct colors for different elements
 PALETTE = [BLUE, GREEN, YELLOW, RED, WHITE]
@@ -681,7 +685,7 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path 
         Path to the rendered video file, or None on failure.
     """
     if template_name not in TEMPLATES:
-        print(f"Unknown template: {template_name}. Available: {list(TEMPLATES.keys())}")
+        logger.warning("Unknown template: %s. Available: %s", template_name, list(TEMPLATES.keys()))
         return None
 
     import inspect
@@ -710,7 +714,7 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path 
     try:
         scene.render()
     except Exception as e:
-        print(f"Render failed: {e}")
+        logger.error("Render failed: %s", e)
         return None
 
     # Find the rendered file - manim outputs to videos/{SceneName}/{quality}/{filename}.mp4
@@ -742,5 +746,5 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path 
         shutil.move(str(rendered), output_path)
         return True
 
-    print(f"Rendered file not found")
+    logger.error("Rendered file not found")
     return None
