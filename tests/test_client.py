@@ -62,13 +62,13 @@ class TestFixJsonStrings:
         text = '{"key": "line1\nline2"}'
         fixed = _fix_json_strings(text)
         parsed = json.loads(fixed)
-        assert parsed["key"] == "line1\\nline2"
+        assert parsed["key"] == "line1\nline2"  # JSON round-trips correctly
 
     def test_tab_in_string(self):
         text = '{"key": "col1\tcol2"}'
         fixed = _fix_json_strings(text)
         parsed = json.loads(fixed)
-        assert parsed["key"] == "col1\\tcol2"
+        assert parsed["key"] == "col1\tcol2"  # JSON round-trips correctly
 
     def test_escaped_quote_preserved(self):
         text = '{"key": "say \\"hello\\""}'
