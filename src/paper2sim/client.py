@@ -6,6 +6,7 @@ and Paper2SimAnimationClient for LLM-driven Manim code generation.
 
 import copy
 import json
+import logging
 import os
 import pathlib
 import re
@@ -27,6 +28,8 @@ from paper2sim.prompts import (
     format_topic_input,
 )
 from paper2sim.prompts.breakdown import BREAKDOWN_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_pdf_text(file_path: pathlib.Path) -> str:
@@ -174,8 +177,8 @@ class Paper2SimBreakdownClient:
             data = json.loads(json_str)
             breakdown = Breakdown.model_validate(data)
         except Exception as e:
-            print(f"Error parsing breakdown: {e}")
-            print("Raw response:", raw_text[:500])
+            logger.error("Error parsing breakdown: %s", e)
+            logger.debug("Raw response: %s", raw_text[:500])
             return None, raw_text
 
         return breakdown, raw_text
@@ -219,8 +222,8 @@ class Paper2SimBreakdownClient:
             data = json.loads(json_str)
             storyboard = TopicStoryboard.model_validate(data)
         except Exception as e:
-            print(f"Error parsing storyboard: {e}")
-            print("Raw response:", raw_text[:500])
+            logger.error("Error parsing storyboard: %s", e)
+            logger.debug("Raw response: %s", raw_text[:500])
             return None, raw_text
 
         return storyboard, raw_text
