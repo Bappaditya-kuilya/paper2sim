@@ -674,11 +674,15 @@ TEMPLATES: dict[str, Callable] = {
 }
 
 
-def render_template(template_name: str, params: dict, output_path: str) -> Path:
-    """Render a named template to an MP4 video using Manim."""
+def render_template(template_name: str, params: dict, output_path: str) -> Path | None:
+    """Render a named template to an MP4 video using Manim.
+
+    Returns:
+        Path to the rendered video file, or None on failure.
+    """
     if template_name not in TEMPLATES:
         print(f"Unknown template: {template_name}. Available: {list(TEMPLATES.keys())}")
-        return False
+        return None
 
     import inspect
     factory = TEMPLATES[template_name]
@@ -707,7 +711,7 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path:
         scene.render()
     except Exception as e:
         print(f"Render failed: {e}")
-        return False
+        return None
 
     # Find the rendered file - manim outputs to videos/{SceneName}/{quality}/{filename}.mp4
     videos_dir = Path(media_dir) / "videos"
@@ -739,4 +743,4 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path:
         return True
 
     print(f"Rendered file not found")
-    return False
+    return None
