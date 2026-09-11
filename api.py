@@ -1,16 +1,23 @@
 """Paper2Sim API — FastAPI backend for equation extraction and visualization."""
 
+import asyncio
+import logging
 import tempfile
 import time
 from pathlib import Path
+from typing import AsyncGenerator
 
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ValidationError
 
 from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse_arxiv_url
 from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
 from workers import create_job, get_job, jobs
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ExtractRequest(BaseModel):
@@ -190,3 +197,37 @@ async def breakdown(req: BreakdownRequest):
 @app.post("/api/storyboard")
 async def storyboard(req: StoryboardRequest):
     return {"error": "Storyboard not yet implemented — use existing storyboard pipeline"}
+
+
+@app.get("/api/render/{job_id}/stream")
+async def render_stream(job_id: str):
+    """SSE stream for render progress updates."""
+    from fastapi.responses import StreamingResponse
+
+    async def event_generator():
+        job = get_job(job_id)
+        if not job:
+            yield f"data: {JSONResponse(content={'error': 'Job not found'}).body.decode()}\n\n"
+            return
+        yield f"data: {JSONResponse(content={'status': job['status'], 'progress': job['progress']}).body.decode()}\n\n"
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.exception_handler(ValidationError)
+async def validation_error_handler(request: Request, exc: ValidationError):
+    return JSONResponse(status_code=422, content={"error": "Validation error", "details": exc.errors()})
+
+
+@app.exception_handler(Exception)
+async def generic_error_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error: {exc}")
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+    logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({duration:.3f}s)")
+    return response
