@@ -87,3 +87,23 @@ def test_render_video_not_ready():
     response = client.get(f"/api/render/{job_id}/video")
     assert response.status_code == 200
     assert "error" in response.json()
+
+
+def test_breakdown_returns_error():
+    response = client.post("/api/breakdown", json={"text": "test"})
+    assert response.status_code == 200
+    assert "error" in response.json()
+
+
+def test_storyboard_returns_error():
+    response = client.post("/api/storyboard", json={"topic": {}, "source_text": ""})
+    assert response.status_code == 200
+    assert "error" in response.json()
+
+
+def test_health_deps_returns_status():
+    response = client.get("/health/dependencies")
+    assert response.status_code == 200
+    data = response.json()
+    assert "pymupdf" in data
+    assert "fastapi" in data
