@@ -11,6 +11,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse_arxiv_url
 from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
@@ -18,6 +20,8 @@ from workers import create_job, get_job, jobs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 class ExtractRequest(BaseModel):
@@ -84,6 +88,7 @@ app = FastAPI(
     version="0.2.0",
 )
 
+app.state.limiter = limiter
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -115,7 +120,8 @@ async def health_deps():
 
 
 @app.post("/api/extract")
-async def extract(req: ExtractRequest):
+@limiter.limit("10/minute")
+async def extract(req: ExtractRequest, request: Request):
     if req.source == "arxiv_url" and req.url:
         arxiv_id = parse_arxiv_url(req.url)
         if not arxiv_id:
