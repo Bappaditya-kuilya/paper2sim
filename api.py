@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
@@ -16,6 +16,8 @@ from slowapi.util import get_remote_address
 
 from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse_arxiv_url
 from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
+from paper2sim.breakdown_client import breakdown_equations
+from paper2sim.storyboard_client import generate_storyboard
 from workers import create_job, get_job, jobs
 
 logging.basicConfig(level=logging.INFO)
@@ -197,12 +199,49 @@ async def render_video(job_id: str):
 
 @app.post("/api/breakdown")
 async def breakdown(req: BreakdownRequest):
-    return {"error": "Breakdown not yet implemented — use existing Paper2SimBreakdownClient"}
+    equations = [{"latex": req.text or "", "type": "unknown"}]
+    result = breakdown_equations(equations, model=req.model)
+    return result
 
 
 @app.post("/api/storyboard")
 async def storyboard(req: StoryboardRequest):
-    return {"error": "Storyboard not yet implemented — use existing storyboard pipeline"}
+    result = generate_storyboard(req.topic, req.source_text)
+    return result
+
+
+@app.post("/api/extract/upload")
+async def extract_upload(file: UploadFile = File(...)):
+    """Extract equations from uploaded PDF."""
+    if not file.filename.endswith(".pdf"):
+        return {"error": "Only PDF files supported"}
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        import fitz
+        doc = fitz.open(tmp_path)
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        doc.close()
+        equations = [{"latex": line.strip(), "type": "display"} for line in text.split("\n") if line.strip() and ("=" in line or "^" in line)]
+        for eq in equations:
+            eq["type"] = classify_equation(eq["latex"])
+        result = select_templates(equations)
+        return ExtractResponse(
+            equations=[Equation(
+                latex=e["equation"],
+                type=classify_equation(e["equation"]),
+                template=e.get("template"),
+            ) for e in result],
+            paper_info={"filename": file.filename},
+        )
+    except Exception as e:
+        return {"error": f"PDF extraction failed: {e}"}
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 @app.get("/api/render/{job_id}/stream")
