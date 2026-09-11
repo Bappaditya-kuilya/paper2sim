@@ -119,3 +119,21 @@ def test_render_stream_returns_event_stream():
     job_id = create.json()["job_id"]
     response = client.get(f"/api/render/{job_id}/stream")
     assert response.status_code == 200
+
+
+def test_breakdown_calls_client():
+    response = client.post("/api/breakdown", json={"text": "F = ma"})
+    assert response.status_code == 200
+    assert "breakdowns" in response.json() or "error" in response.json()
+
+
+def test_storyboard_calls_client():
+    response = client.post("/api/storyboard", json={"topic": {"name": "test"}, "source_text": ""})
+    assert response.status_code == 200
+    assert "scenes" in response.json() or "error" in response.json()
+
+
+def test_extract_upload_rejects_non_pdf():
+    response = client.post("/api/extract/upload", files={"file": ("test.txt", b"content", "text/plain")})
+    assert response.status_code == 200
+    assert "error" in response.json()
