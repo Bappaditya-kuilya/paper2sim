@@ -1,8 +1,14 @@
 """Paper2Sim API — FastAPI backend for equation extraction and visualization."""
 
-from fastapi import FastAPI
+import tempfile
+from pathlib import Path
+
+from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse_arxiv_url
+from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
 
 
 class ExtractRequest(BaseModel):
@@ -45,4 +51,40 @@ async def health():
 
 @app.post("/api/extract")
 async def extract(req: ExtractRequest):
-    return {"message": "not implemented"}
+    if req.source == "arxiv_url" and req.url:
+        arxiv_id = parse_arxiv_url(req.url)
+        if not arxiv_id:
+            return {"error": "Invalid arXiv URL"}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir)
+            source_path = download_source(arxiv_id, str(dest))
+            if source_path:
+                tex_files = list(dest.rglob("*.tex"))
+                if tex_files:
+                    tex_content = tex_files[0].read_text(errors="replace")
+                    equations = extract_equations_from_tex(tex_content)
+                    for eq in equations:
+                        eq["type"] = classify_equation(eq["latex"])
+                    result = select_templates(equations)
+                    return ExtractResponse(
+                        equations=[Equation(
+                            latex=e["equation"],
+                            type=classify_equation(e["equation"]),
+                            template=e.get("template"),
+                        ) for e in result],
+                        paper_info={"arxiv_id": arxiv_id},
+                    )
+            pdf_path = download_pdf(arxiv_id, str(dest))
+            if pdf_path:
+                return {"error": "PDF extraction not yet implemented"}
+        return {"error": "Failed to download paper"}
+    elif req.source == "text" and req.text:
+        equations = [{"latex": req.text, "type": "display"}]
+        equations[0]["type"] = classify_equation(req.text)
+        result = select_templates(equations)
+        return ExtractResponse(equations=[Equation(
+            latex=e["equation"],
+            type=classify_equation(e["equation"]),
+            template=e.get("template"),
+        ) for e in result])
+    return {"error": "Invalid request"}
