@@ -237,3 +237,8 @@ async def log_requests(request: Request, call_next):
     duration = time.time() - start
     logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({duration:.3f}s)")
     return response
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, workers=4)
