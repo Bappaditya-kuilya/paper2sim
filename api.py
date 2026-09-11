@@ -1,6 +1,7 @@
 """Paper2Sim API — FastAPI backend for equation extraction and visualization."""
 
 import tempfile
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile
@@ -41,6 +42,35 @@ class RenderResponse(BaseModel):
     status: str
 
 
+class BreakdownRequest(BaseModel):
+    pdf_path: str | None = None
+    text: str | None = None
+    model: str = "openai/gpt-oss-120b"
+
+
+class StoryboardRequest(BaseModel):
+    topic: dict
+    source_text: str = ""
+
+
+# In-memory TTL cache
+_cache: dict[str, tuple[float, any]] = {}
+CACHE_TTL = 3600  # 1 hour
+
+
+def cache_get(key: str):
+    if key in _cache:
+        ts, val = _cache[key]
+        if time.time() - ts < CACHE_TTL:
+            return val
+        del _cache[key]
+    return None
+
+
+def cache_set(key: str, val):
+    _cache[key] = (time.time(), val)
+
+
 app = FastAPI(
     title="Paper2Sim API",
     description="Extract equations from papers and visualize them interactively",
@@ -61,12 +91,31 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/health/dependencies")
+async def health_deps():
+    deps = {}
+    try:
+        import fitz
+        deps["pymupdf"] = "ok"
+    except ImportError:
+        deps["pymupdf"] = "missing"
+    try:
+        import fastapi
+        deps["fastapi"] = "ok"
+    except ImportError:
+        deps["fastapi"] = "missing"
+    return deps
+
+
 @app.post("/api/extract")
 async def extract(req: ExtractRequest):
     if req.source == "arxiv_url" and req.url:
         arxiv_id = parse_arxiv_url(req.url)
         if not arxiv_id:
             return {"error": "Invalid arXiv URL"}
+        cached = cache_get(f"arxiv:{arxiv_id}")
+        if cached:
+            return cached
         with tempfile.TemporaryDirectory() as tmpdir:
             dest = Path(tmpdir)
             source_path = download_source(arxiv_id, str(dest))
@@ -78,7 +127,7 @@ async def extract(req: ExtractRequest):
                     for eq in equations:
                         eq["type"] = classify_equation(eq["latex"])
                     result = select_templates(equations)
-                    return ExtractResponse(
+                    response = ExtractResponse(
                         equations=[Equation(
                             latex=e["equation"],
                             type=classify_equation(e["equation"]),
@@ -86,6 +135,8 @@ async def extract(req: ExtractRequest):
                         ) for e in result],
                         paper_info={"arxiv_id": arxiv_id},
                     )
+                    cache_set(f"arxiv:{arxiv_id}", response)
+                    return response
             pdf_path = download_pdf(arxiv_id, str(dest))
             if pdf_path:
                 return {"error": "PDF extraction not yet implemented"}
@@ -129,3 +180,13 @@ async def render_video(job_id: str):
     if job["status"] != "complete":
         return {"error": "Video not ready"}
     return {"video_path": job["video_path"]}
+
+
+@app.post("/api/breakdown")
+async def breakdown(req: BreakdownRequest):
+    return {"error": "Breakdown not yet implemented — use existing Paper2SimBreakdownClient"}
+
+
+@app.post("/api/storyboard")
+async def storyboard(req: StoryboardRequest):
+    return {"error": "Storyboard not yet implemented — use existing storyboard pipeline"}
