@@ -107,3 +107,15 @@ def test_health_deps_returns_status():
     data = response.json()
     assert "pymupdf" in data
     assert "fastapi" in data
+
+
+def test_validation_error_returns_422():
+    response = client.post("/api/extract", json={"invalid": "data"})
+    assert response.status_code == 422
+
+
+def test_render_stream_returns_event_stream():
+    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
+    job_id = create.json()["job_id"]
+    response = client.get(f"/api/render/{job_id}/stream")
+    assert response.status_code == 200
