@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
@@ -12,12 +13,14 @@ const DEMO_EQUATIONS = [
 ]
 
 export default function App() {
+  const [mobileOpen, setMobileOpen] = useState(false)
+
   return (
     <div className="flex h-screen flex-col bg-zinc-900 text-zinc-100">
       <Toaster position="top-right" />
-      <Header />
+      <Header mobileOpen={mobileOpen} onToggleMobile={() => setMobileOpen((o) => !o)} />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
+        <Sidebar mobileOpen={mobileOpen} />
         <MainContent>
           <div className="mx-auto max-w-4xl space-y-6">
             <ProgressTracker

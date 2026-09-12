@@ -51,10 +51,12 @@ export function PaperInput({ onAnalyze, loading = false }: PaperInputProps) {
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 md:p-6">
-      <div className="mb-4 flex gap-1 rounded-md bg-zinc-900 p-1">
+      <div role="tablist" className="mb-4 flex gap-1 rounded-md bg-zinc-900 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={mode === tab.id}
             onClick={() => setMode(tab.id)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               mode === tab.id
@@ -70,6 +72,7 @@ export function PaperInput({ onAnalyze, loading = false }: PaperInputProps) {
       {mode === 'arxiv' && (
         <input
           type="url"
+          aria-label="arXiv URL"
           placeholder="https://arxiv.org/abs/2401.00001"
           value={arxivUrl}
           onChange={(e) => setArxivUrl(e.target.value)}
@@ -79,6 +82,7 @@ export function PaperInput({ onAnalyze, loading = false }: PaperInputProps) {
 
       {mode === 'equation' && (
         <textarea
+          aria-label="Equation"
           placeholder="E = mc^2"
           value={equation}
           onChange={(e) => setEquation(e.target.value)}
@@ -114,6 +118,7 @@ export function PaperInput({ onAnalyze, loading = false }: PaperInputProps) {
             ref={fileInputRef}
             type="file"
             accept=".pdf"
+            aria-label="Upload PDF"
             onChange={handleFileChange}
             className="hidden"
           />

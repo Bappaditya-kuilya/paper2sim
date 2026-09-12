@@ -9,16 +9,17 @@ const NAV_ITEMS = [
 interface SidebarProps {
   activeItem?: string
   onNavigate?: (id: string) => void
+  mobileOpen?: boolean
 }
 
-export function Sidebar({ activeItem = 'extract', onNavigate }: SidebarProps) {
+export function Sidebar({ activeItem = 'extract', onNavigate, mobileOpen = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <aside
-      className={`hidden md:flex flex-col border-r border-zinc-800 bg-zinc-950 transition-all duration-200 ${
+      className={`flex-col border-r border-zinc-800 bg-zinc-950 transition-all duration-200 ${
         collapsed ? 'w-16' : 'w-56'
-      }`}
+      } ${mobileOpen ? 'flex' : 'hidden md:flex'}`}
     >
       <button
         className="flex items-center justify-center border-b border-zinc-800 p-3 text-zinc-500 hover:text-zinc-300"
@@ -33,11 +34,12 @@ export function Sidebar({ activeItem = 'extract', onNavigate }: SidebarProps) {
           )}
         </svg>
       </button>
-      <nav className="flex flex-col gap-1 p-2">
+      <nav aria-label="Navigation" className="flex flex-col gap-1 p-2">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate?.(item.id)}
+            aria-label={item.label}
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
               activeItem === item.id
                 ? 'bg-zinc-800 text-zinc-100'

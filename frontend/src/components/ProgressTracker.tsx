@@ -5,7 +5,7 @@ interface ProgressTrackerProps {
 
 export function ProgressTracker({ currentStep, steps }: ProgressTrackerProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div aria-label="Progress" className="flex items-center gap-2">
       {steps.map((step, i) => {
         const isComplete = i < currentStep
         const isCurrent = i === currentStep
@@ -13,6 +13,7 @@ export function ProgressTracker({ currentStep, steps }: ProgressTrackerProps) {
           <div key={step} className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <div
+                aria-current={isCurrent ? 'step' : undefined}
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
                   isComplete
                     ? 'bg-zinc-100 text-zinc-900'
