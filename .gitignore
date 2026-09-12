@@ -247,3 +247,5 @@ agent_workspace/
 text.md
 plan.md
 .scratch/
+.vercel
+.env*
