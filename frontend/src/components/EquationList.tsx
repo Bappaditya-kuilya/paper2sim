@@ -1,6 +1,7 @@
 import { EquationCard } from './EquationCard'
 
 interface Equation {
+  id?: string
   latex: string
   type: string
   template?: string
@@ -50,9 +51,9 @@ export function EquationList({ equations, loading, onSelect }: EquationListProps
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {equations.map((eq) => (
+      {equations.map((eq, i) => (
         <EquationCard
-          key={eq.latex}
+          key={eq.id ?? `${eq.latex}-${i}`}
           latex={eq.latex}
           type={eq.type}
           template={eq.template}
