@@ -20,7 +20,7 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState(0)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
 
-  const { equations, loading: extractLoading, error: extractError, extract } = useExtract()
+  const { equations, loading: extractLoading, error: extractError, extract, demoMode } = useExtract()
   const { job, error: renderError, startRender, pollStatus } = useRender()
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -84,9 +84,17 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col bg-zinc-900 text-zinc-100">
       <Toaster position="top-right" />
+      {demoMode && (
+        <div className="fixed bottom-4 left-4 right-4 z-50 rounded-lg border border-yellow-700 bg-yellow-900/90 p-4 text-yellow-200 backdrop-blur">
+          <p className="text-sm">
+            <strong>Demo Mode:</strong> Backend server is not connected. Showing sample equations.
+            To use full functionality, start the backend server with <code className="rounded bg-yellow-800 px-1">python api.py</code>
+          </p>
+        </div>
+      )}
       <Header mobileOpen={mobileOpen} onToggleMobile={() => setMobileOpen((o) => !o)} />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar mobileOpen={mobileOpen} />
+        <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
         <MainContent>
           <div className="mx-auto max-w-4xl space-y-6">
             <ProgressTracker currentStep={currentStep} steps={STEPS} />
