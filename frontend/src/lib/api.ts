@@ -1,9 +1,27 @@
 import type { ExtractResponse, RenderJob, BreakdownResponse } from '../types';
 import { AppError } from './errors';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
-export async function apiFetch<T>(path: string, options?: RequestInit, retries = 3): Promise<T> {
+let backendAvailable: boolean | null = null;
+
+async function checkBackend(): Promise<boolean> {
+  if (backendAvailable !== null) return backendAvailable;
+  try {
+    const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
+    backendAvailable = res.ok;
+  } catch {
+    backendAvailable = false;
+  }
+  return backendAvailable;
+}
+
+export async function apiFetch<T>(path: string, options?: RequestInit, retries = 1): Promise<T> {
+  const available = await checkBackend();
+  if (!available) {
+    throw new AppError('Backend server is not available. Please ensure the API server is running.', 'BACKEND_OFFLINE');
+  }
+
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch(`${API_BASE}${path}`, {
@@ -16,6 +34,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit, retries =
       }
       return res.json();
     } catch (e) {
+      if (e instanceof AppError && e.code === 'BACKEND_OFFLINE') throw e;
       if (i === retries - 1) throw e;
       await new Promise(r => setTimeout(r, 1000 * (i + 1)));
     }
