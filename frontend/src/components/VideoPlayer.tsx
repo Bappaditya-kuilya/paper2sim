@@ -64,6 +64,11 @@ export function VideoPlayer({ src, onDownload }: VideoPlayerProps) {
         </button>
         <div
           onClick={handleSeek}
+          role="slider"
+          aria-label="Seek bar"
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
           className="relative h-1.5 flex-1 cursor-pointer rounded-full bg-zinc-800"
         >
           <div
