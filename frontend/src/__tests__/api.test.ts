@@ -8,7 +8,8 @@ test('apiFetch throws on non-ok response', async () => {
   vi.mocked(global.fetch).mockResolvedValue({
     ok: false,
     status: 500,
+    text: async () => '',
   } as Response)
 
-  await expect(apiFetch('/test')).rejects.toThrow('API error: 500')
+  await expect(apiFetch('/test')).rejects.toThrow('API error 500')
 })
