@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../lib/api';
+import { api, resetBackendCheck } from '../lib/api';
 import type { Equation } from '../types';
 
 const DEMO_EQUATIONS: Equation[] = [
@@ -19,6 +19,7 @@ export function useExtract() {
   const extract = async (source: string, url?: string, text?: string) => {
     setLoading(true);
     setError(null);
+    resetBackendCheck();
     try {
       const res = await api.extract({ source, url, text });
       setEquations(res.equations);

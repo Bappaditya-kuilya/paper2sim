@@ -12,6 +12,8 @@ import { useExtract } from './hooks/useExtract'
 import { useRender } from './hooks/useRender'
 import type { Equation } from './types'
 
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 const STEPS = ['Extract', 'Classify', 'Visualize', 'Render']
 
 export default function App() {
@@ -23,6 +25,12 @@ export default function App() {
   const { equations, loading: extractLoading, error: extractError, extract, demoMode } = useExtract()
   const { job, error: renderError, startRender, pollStatus } = useRender()
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (API_BASE) {
+      fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(15000) }).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     if (extractError) showToast(extractError, 'error')
