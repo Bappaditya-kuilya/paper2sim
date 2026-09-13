@@ -22,7 +22,7 @@ def format_extract_response(equations: list[dict], paper_info: dict | None = Non
 
 def format_error_response(error: str, details: dict | None = None) -> dict:
     """Format error for API response."""
-    resp = {"error": error}
+    resp: dict[str, str | dict] = {"error": error}
     if details:
         resp["details"] = details
     return resp

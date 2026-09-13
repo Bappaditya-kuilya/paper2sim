@@ -221,13 +221,13 @@ def classify_equation(latex: str) -> str:
 
 def select_templates(equations: list[dict[str, str]]) -> list[dict[str, str | dict]]:
     """Map equations to Manim template names."""
-    results = []
+    results: list[dict[str, str | dict]] = []
     for eq in equations:
         eq_type = classify_equation(eq["latex"])
         template = _template_for_type(eq_type, eq["latex"])
         results.append({
             "equation": eq["latex"],
-            "template": template,
+            "template": template or "",
             "params": {},
         })
     return results

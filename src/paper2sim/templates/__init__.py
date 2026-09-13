@@ -744,7 +744,7 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path 
     if rendered and rendered.exists():
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(rendered), output_path)
-        return True
+        return Path(output_path)
 
     logger.error("Rendered file not found")
     return None
