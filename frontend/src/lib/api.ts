@@ -7,16 +7,20 @@ let backendAvailable: boolean | null = null;
 
 async function checkBackend(): Promise<boolean> {
   if (backendAvailable !== null) return backendAvailable;
-  try {
-    const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
-    backendAvailable = res.ok;
-  } catch {
-    backendAvailable = false;
+  for (let i = 0; i < 2; i++) {
+    try {
+      const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(10000) });
+      if (res.ok) { backendAvailable = true; return true; }
+    } catch { /* retry once */ }
+    if (i === 0) await new Promise(r => setTimeout(r, 2000));
   }
-  return backendAvailable;
+  backendAvailable = false;
+  return false;
 }
 
-export async function apiFetch<T>(path: string, options?: RequestInit, retries = 1): Promise<T> {
+export function resetBackendCheck() { backendAvailable = null; }
+
+export async function apiFetch<T>(path: string, options?: RequestInit, retries = 2): Promise<T> {
   const available = await checkBackend();
   if (!available) {
     throw new AppError('Backend server is not available. Please ensure the API server is running.', 'BACKEND_OFFLINE');
