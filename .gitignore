@@ -246,6 +246,7 @@ agent_workspace/
 # Planning docs (local only)
 text.md
 plan.md
+fly.md
 .scratch/
 .vercel
 .env*
