@@ -1,6 +1,5 @@
 """Template selector for Paper2Sim visualization."""
 
-
 TEMPLATE_MAP = {
     "trigonometric": ["TrigSurface", "WaveAnimation"],
     "polynomial": ["PolySurface", "CurvePlot"],

@@ -1,6 +1,6 @@
 import toast from 'react-hot-toast'
 
-export function showError(message: string) {
+export function showError(message: string) { // eslint-disable-line react/only-export-components
   toast.error(message, {
     style: {
       background: '#18181b',

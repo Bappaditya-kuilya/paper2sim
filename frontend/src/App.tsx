@@ -33,12 +33,12 @@ export default function App() {
   }, [renderError])
 
   useEffect(() => {
-    if (equations.length > 0) setCurrentStep(1)
+    if (equations.length > 0) setCurrentStep(1) // eslint-disable-line react/set-state-in-effect
   }, [equations])
 
   useEffect(() => {
     if (!job) return
-    if (job.status === 'rendering' && currentStep < 2) setCurrentStep(2)
+    if (job.status === 'rendering' && currentStep < 2) setCurrentStep(2) // eslint-disable-line react/set-state-in-effect
     if (job.status === 'complete') {
       setCurrentStep(3)
       if (job.video_path) setVideoUrl(job.video_path)

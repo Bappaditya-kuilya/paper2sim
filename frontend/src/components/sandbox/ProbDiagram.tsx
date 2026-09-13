@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
 
 export interface ProbDiagramProps {
@@ -10,19 +10,12 @@ export interface ProbDiagramProps {
 }
 
 export function ProbDiagram({
-  pA = 0.3,
-  pB = 0.4,
-  pAandB = 0.15,
+  pA: _pA,
+  pB: _pB,
+  pAandB: _pAandB,
   showConditional = false,
   showSliders = true,
 }: ProbDiagramProps) {
-  const [localPA, setLocalPA] = useState(pA);
-  const [localPB, setLocalPB] = useState(pB);
-
-  const pAorB = localPA + localPB - pAandB;
-  const pAgivenB = localPB > 0 ? pAandB / localPB : 0;
-  const pBgivenA = localPA > 0 ? pAandB / localPA : 0;
-
   const circleRadius = 1.5;
   const offset = 0.8;
 
@@ -79,8 +72,8 @@ export interface CalculatorDisplayProps {
 }
 
 export function CalculatorDisplay({
-  expression = '2 + 3 * 4',
-  result = 14,
+  expression: _expression,
+  result: _result,
   history = [],
 }: CalculatorDisplayProps) {
   return (

@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react';
+
 import { createStore } from '../lib/store';
 describe('createStore', () => {
   it('returns initial value', () => { const store = createStore(42); expect(store.get()).toBe(42); });

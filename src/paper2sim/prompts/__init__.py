@@ -22,4 +22,3 @@ __all__ = [
     "format_storyboard_prompt",
     "format_topic_input",
 ]
-

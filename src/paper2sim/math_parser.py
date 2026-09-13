@@ -32,13 +32,20 @@ def normalize_input(raw: str) -> str:
     # Keep right side of "="
     eq_idx = s.find("=")
     if eq_idx != -1:
-        s = s[eq_idx + 1:]
+        s = s[eq_idx + 1 :]
 
     # Greek letters (before implicit multiply)
     greek = {
-        "α": "alpha", "β": "beta", "γ": "gamma", "δ": "delta",
-        "θ": "theta", "λ": "lambda", "μ": "mu", "σ": "sigma",
-        "π": "pi", "ω": "omega",
+        "α": "alpha",
+        "β": "beta",
+        "γ": "gamma",
+        "δ": "delta",
+        "θ": "theta",
+        "λ": "lambda",
+        "μ": "mu",
+        "σ": "sigma",
+        "π": "pi",
+        "ω": "omega",
     }
     for sym, name in greek.items():
         s = s.replace(sym, name)

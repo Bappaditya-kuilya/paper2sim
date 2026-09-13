@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import React from 'react';
 
 vi.mock('@react-three/fiber', () => ({

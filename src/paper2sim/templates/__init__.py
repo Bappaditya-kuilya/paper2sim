@@ -5,25 +5,24 @@ Each template is a factory function that returns a Manim Scene class
 parameterized by the given arguments. No LLM code generation needed.
 """
 
-import inspect
 import logging
 import math
 import shutil
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from manim import (
-    Axes,
     BLUE,
     DOWN,
     LEFT,
     ORIGIN,
+    RED,
     RIGHT,
     UP,
-    RED,
     WHITE,
     YELLOW,
     Arrow,
+    Axes,
     Create,
     Dot,
     FadeIn,
@@ -78,8 +77,10 @@ def _tex(text: str, **kwargs) -> Text:
 # 1. Matrix Multiply
 # ---------------------------------------------------------------------------
 
+
 def matrix_multiply(m: int = 2, n: int = 3, p: int = 2, title: str = "Matrix Multiplication") -> type[Scene]:
     """Template: matrix_multiply - Matrix multiplication visualization A(m×n) × B(n×p) = C(m×p)."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -125,8 +126,10 @@ def matrix_multiply(m: int = 2, n: int = 3, p: int = 2, title: str = "Matrix Mul
 # 2. Attention Heatmap
 # ---------------------------------------------------------------------------
 
+
 def attention_heatmap(seq_len: int = 8, head_dim: int = 16, title: str = "Attention Scores") -> type[Scene]:
     """Template: attention_heatmap - Self-attention score heatmap showing Q×K^T similarity matrix."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -171,8 +174,10 @@ def attention_heatmap(seq_len: int = 8, head_dim: int = 16, title: str = "Attent
 # 3. Gradient Descent
 # ---------------------------------------------------------------------------
 
+
 def gradient_descent(loss_fn: str = "quadratic", steps: int = 10, learning_rate: float = 0.1, title: str = "Gradient Descent") -> type[Scene]:
     """Template: gradient_descent - Gradient descent optimization on a loss surface with step visualization."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -180,9 +185,13 @@ def gradient_descent(loss_fn: str = "quadratic", steps: int = 10, learning_rate:
         axes = Axes(x_range=[-1, 5], y_range=[0, 10], axis_config={"include_numbers": False}).scale(0.8)
 
         if loss_fn == "quadratic":
-            f = lambda x: (x - 2) ** 2
+
+            def f(x):
+                return (x - 2) ** 2
         else:
-            f = lambda x: x ** 2
+
+            def f(x):
+                return x**2
 
         graph = FunctionGraph(f, x_range=[-1, 5, 0.01], color=BLUE)
         graph_label = Text("L(θ)", font_size=28, color=BLUE).next_to(axes.c2p(5, f(5)), RIGHT)
@@ -222,8 +231,10 @@ def gradient_descent(loss_fn: str = "quadratic", steps: int = 10, learning_rate:
 # 4. Convolution 1D
 # ---------------------------------------------------------------------------
 
+
 def convolution_1d(signal_len: int = 10, kernel_size: int = 3, title: str = "1D Convolution") -> type[Scene]:
     """Template: convolution_1d - 1D convolution sliding kernel over signal with output computation."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -286,9 +297,14 @@ def convolution_1d(signal_len: int = 10, kernel_size: int = 3, title: str = "1D 
 
         self.wait(1)
         self.play(
-            FadeOut(title_mob), FadeOut(sig_cells), FadeOut(kern_cells),
-            FadeOut(sig_label), FadeOut(kern_label), FadeOut(out_cells),
-            FadeOut(out_label), FadeOut(highlight),
+            FadeOut(title_mob),
+            FadeOut(sig_cells),
+            FadeOut(kern_cells),
+            FadeOut(sig_label),
+            FadeOut(kern_label),
+            FadeOut(out_cells),
+            FadeOut(out_label),
+            FadeOut(highlight),
         )
 
     return _make_scene(construct)
@@ -297,6 +313,7 @@ def convolution_1d(signal_len: int = 10, kernel_size: int = 3, title: str = "1D 
 # ---------------------------------------------------------------------------
 # 5. Softmax Distribution
 # ---------------------------------------------------------------------------
+
 
 def softmax_distribution(values: list[float] | None = None, title: str = "Softmax") -> type[Scene]:
     """Template: softmax_distribution - Softmax probability distribution from logits with bar chart."""
@@ -349,8 +366,11 @@ def softmax_distribution(values: list[float] | None = None, title: str = "Softma
 
         self.wait(2)
         self.play(
-            FadeOut(title_mob), FadeOut(formula), FadeOut(input_vals),
-            FadeOut(exp_vals_mob), FadeOut(bar_group),
+            FadeOut(title_mob),
+            FadeOut(formula),
+            FadeOut(input_vals),
+            FadeOut(exp_vals_mob),
+            FadeOut(bar_group),
         )
 
     return _make_scene(construct)
@@ -360,8 +380,10 @@ def softmax_distribution(values: list[float] | None = None, title: str = "Softma
 # 6. Embedding Lookup
 # ---------------------------------------------------------------------------
 
+
 def embedding_lookup(vocab_size: int = 10, embed_dim: int = 4, title: str = "Embedding Lookup") -> type[Scene]:
     """Template: embedding_lookup - Embedding table lookup showing word-to-vector retrieval."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -419,8 +441,13 @@ def embedding_lookup(vocab_size: int = 10, embed_dim: int = 4, title: str = "Emb
         self.wait(2)
 
         self.play(
-            FadeOut(title_mob), FadeOut(bg), FadeOut(table),
-            FadeOut(query), FadeOut(arrow), FadeOut(highlight), FadeOut(result),
+            FadeOut(title_mob),
+            FadeOut(bg),
+            FadeOut(table),
+            FadeOut(query),
+            FadeOut(arrow),
+            FadeOut(highlight),
+            FadeOut(result),
         )
 
     return _make_scene(construct)
@@ -430,8 +457,10 @@ def embedding_lookup(vocab_size: int = 10, embed_dim: int = 4, title: str = "Emb
 # 7. Loss Landscape
 # ---------------------------------------------------------------------------
 
+
 def loss_landscape(loss_type: str = "mse", title: str = "Loss Function") -> type[Scene]:
     """Template: loss_landscape - Loss function landscape (MSE or cross-entropy) with gradient descent path."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -439,10 +468,16 @@ def loss_landscape(loss_type: str = "mse", title: str = "Loss Function") -> type
         axes = Axes(x_range=[-1, 7], y_range=[0, 16], axis_config={"include_numbers": False}).scale(0.8)
 
         if loss_type == "mse":
-            f = lambda x: (x - 3) ** 2
+
+            def f(x):
+                return (x - 3) ** 2
+
             label = Text("L = (y - ŷ)²", font_size=28, color=BLUE)
         else:
-            f = lambda x: -math.log(max(1e-6, 1 / (1 + math.exp(-x))))
+
+            def f(x):
+                return -math.log(max(1e-6, 1 / (1 + math.exp(-x))))
+
             label = Text("L = -log(σ(z))", font_size=28, color=BLUE)
 
         graph = FunctionGraph(f, x_range=[-1, 7, 0.01], color=BLUE)
@@ -482,8 +517,10 @@ def loss_landscape(loss_type: str = "mse", title: str = "Loss Function") -> type
 # 8. Transformer Block
 # ---------------------------------------------------------------------------
 
+
 def transformer_block(title: str = "Transformer Block") -> type[Scene]:
     """Template: transformer_block - Transformer encoder block with attention, FFN, and skip connections."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -552,6 +589,7 @@ def transformer_block(title: str = "Transformer Block") -> type[Scene]:
 # 9. Linear Combination
 # ---------------------------------------------------------------------------
 
+
 def linear_combination(
     vectors: list[tuple[float, float]] | None = None,
     weights: list[float] | None = None,
@@ -574,7 +612,7 @@ def linear_combination(
         for i, (vx, vy) in enumerate(vectors):
             end = origin + RIGHT * vx * 0.8 + UP * vy * 0.8
             arrow = Arrow(origin, end, buff=0, color=colors[i % len(colors)], stroke_width=3)
-            label = Text(f"v{i+1}", font_size=24, color=colors[i % len(colors)])
+            label = Text(f"v{i + 1}", font_size=24, color=colors[i % len(colors)])
             label.next_to(end, RIGHT, buff=0.1)
             vec_mobs.append((arrow, label))
             self.play(Create(arrow), Write(label))
@@ -587,7 +625,7 @@ def linear_combination(
             sx, sy = vx * w, vy * w
             end = origin + RIGHT * sx * 0.8 + UP * sy * 0.8
             arrow = Arrow(origin, end, buff=0, color=colors[i % len(colors)], stroke_width=2, stroke_opacity=0.5)
-            w_label = Text(f"{w:.1f} * v{i+1}", font_size=20, color=colors[i % len(colors)])
+            w_label = Text(f"{w:.1f} * v{i + 1}", font_size=20, color=colors[i % len(colors)])
             w_label.next_to(end, RIGHT, buff=0.1)
             scaled.add(arrow)
             self.play(Create(arrow), Write(w_label), run_time=0.5)
@@ -602,8 +640,8 @@ def linear_combination(
         self.wait(2)
 
         all_mobs = VGroup(title_mob, result_arrow, result_label)
-        for a, l in vec_mobs:
-            all_mobs.add(a, l)
+        for a, lbl in vec_mobs:
+            all_mobs.add(a, lbl)
         all_mobs.add(*scaled)
         self.play(FadeOut(all_mobs))
 
@@ -614,8 +652,10 @@ def linear_combination(
 # 10. Probability Distribution
 # ---------------------------------------------------------------------------
 
+
 def probability_distribution(dist_type: str = "gaussian", title: str = "Probability Distribution") -> type[Scene]:
     """Template: probability_distribution - Probability density (Gaussian or Uniform) with random sampling."""
+
     def construct(self):
         title_mob = Text(title, font_size=36).to_edge(UP)
         self.play(Write(title_mob))
@@ -624,10 +664,16 @@ def probability_distribution(dist_type: str = "gaussian", title: str = "Probabil
 
         if dist_type == "gaussian":
             mu, sigma = 0, 1
-            f = lambda x: (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+            def f(x):
+                return (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
             label = Text("f(x) = (1/σ√2π) e^(-(x-μ)²/2σ²)", font_size=22, color=BLUE)
         else:
-            f = lambda x: 0.25 if -2 <= x <= 2 else 0
+
+            def f(x):
+                return 0.25 if -2 <= x <= 2 else 0
+
             label = Text("f(x) = 0.25 for -2 ≤ x ≤ 2", font_size=22, color=BLUE)
 
         graph = FunctionGraph(f, x_range=[-4, 4, 0.01], color=BLUE)
@@ -653,8 +699,11 @@ def probability_distribution(dist_type: str = "gaussian", title: str = "Probabil
 
         self.wait(1)
         self.play(
-            FadeOut(title_mob), FadeOut(axes), FadeOut(graph),
-            FadeOut(label), FadeOut(sample_text),
+            FadeOut(title_mob),
+            FadeOut(axes),
+            FadeOut(graph),
+            FadeOut(label),
+            FadeOut(sample_text),
         )
 
     return _make_scene(construct)
@@ -689,6 +738,7 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path 
         return None
 
     import inspect
+
     factory = TEMPLATES[template_name]
     valid_params = inspect.signature(factory).parameters
     safe_params = {k: v for k, v in params.items() if k in valid_params}
@@ -697,9 +747,9 @@ def render_template(template_name: str, params: dict, output_path: str) -> Path 
     for k, sig_param in valid_params.items():
         if k in safe_params:
             expected_type = sig_param.annotation if sig_param.annotation != inspect.Parameter.empty else None
-            if expected_type == int:
+            if expected_type is int:
                 safe_params[k] = int(safe_params[k])
-            elif expected_type == float:
+            elif expected_type is float:
                 safe_params[k] = float(safe_params[k])
 
     scene_cls = factory(**safe_params)

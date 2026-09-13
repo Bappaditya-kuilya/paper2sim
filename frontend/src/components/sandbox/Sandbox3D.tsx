@@ -1,6 +1,6 @@
-import React, { useRef, useMemo } from 'react';
+import React from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, AxesHelper } from '@react-three/drei';
+import { OrbitControls, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 
 export interface Sandbox3DProps {

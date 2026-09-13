@@ -58,9 +58,9 @@ def _extract_json(text: str) -> str:
     Handles: <think> blocks, **bold**, ```json fences, and raw JSON with brace tracking.
     """
     # Strip thinking blocks
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     # Strip markdown bold
-    text = re.sub(r'\*\*', '', text)
+    text = re.sub(r"\*\*", "", text)
     # Try to extract from code block first
     match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
     if match:
@@ -69,7 +69,7 @@ def _extract_json(text: str) -> str:
     if match:
         return match.group(1)
     # Otherwise find raw JSON object
-    start = text.find('{')
+    start = text.find("{")
     if start == -1:
         return text
     depth = 0
@@ -80,16 +80,16 @@ def _extract_json(text: str) -> str:
         if escape:
             escape = False
             continue
-        if c == '\\' and in_string:
+        if c == "\\" and in_string:
             escape = True
             continue
         if c == '"' and not escape:
             in_string = not in_string
             continue
         if not in_string:
-            if c == '{':
+            if c == "{":
                 depth += 1
-            elif c == '}':
+            elif c == "}":
                 depth -= 1
                 if depth == 0:
                     return text[start : i + 1]
@@ -106,7 +106,7 @@ def _fix_json_strings(text: str) -> str:
             result.append(c)
             escape = False
             continue
-        if c == '\\' and in_string:
+        if c == "\\" and in_string:
             result.append(c)
             escape = True
             continue
@@ -115,17 +115,17 @@ def _fix_json_strings(text: str) -> str:
             result.append(c)
             continue
         if in_string:
-            if c == '\n':
-                result.append('\\n')
-            elif c == '\r':
-                result.append('\\r')
-            elif c == '\t':
-                result.append('\\t')
+            if c == "\n":
+                result.append("\\n")
+            elif c == "\r":
+                result.append("\\r")
+            elif c == "\t":
+                result.append("\\t")
             else:
                 result.append(c)
         else:
             result.append(c)
-    return ''.join(result)
+    return "".join(result)
 
 
 class Paper2SimBreakdownClient:
@@ -287,6 +287,7 @@ class Paper2SimAnimationClient:
                 item.unlink()
             elif item.is_dir():
                 import shutil
+
                 shutil.rmtree(item)
         scene_file = self.animation_workspace_path / "scene.py"
         scene_file.write_text(SCENE_BOILERPLATE)
@@ -355,21 +356,25 @@ class Paper2SimAnimationClient:
 
         for topic_idx in topic_indices:
             if topic_idx >= len(storyboards):
-                results.append(AnimationResult(
-                    topic_index=topic_idx,
-                    topic_name=breakdown.topics[topic_idx].name if topic_idx < len(breakdown.topics) else "Unknown",
-                    success=False,
-                    error_message=f"No storyboard found for topic index {topic_idx}",
-                ))
+                results.append(
+                    AnimationResult(
+                        topic_index=topic_idx,
+                        topic_name=breakdown.topics[topic_idx].name if topic_idx < len(breakdown.topics) else "Unknown",
+                        success=False,
+                        error_message=f"No storyboard found for topic index {topic_idx}",
+                    )
+                )
                 continue
 
             if topic_idx >= len(breakdown.topics):
-                results.append(AnimationResult(
-                    topic_index=topic_idx,
-                    topic_name="Unknown",
-                    success=False,
-                    error_message=f"No topic found in breakdown for index {topic_idx}",
-                ))
+                results.append(
+                    AnimationResult(
+                        topic_index=topic_idx,
+                        topic_name="Unknown",
+                        success=False,
+                        error_message=f"No topic found in breakdown for index {topic_idx}",
+                    )
+                )
                 continue
 
             storyboard = storyboards[topic_idx]
@@ -418,18 +423,29 @@ class Paper2SimAnimationClient:
                     video_path = output_file
                 if on_progress:
                     on_progress(topic_idx, iteration, f"Success! Video saved to {video_path}")
-                results.append(AnimationResult(
-                    topic_index=topic_idx, topic_name=topic_name, success=True,
-                    video_path=video_path, scene_code=scene_code, iterations=iteration,
-                ))
+                results.append(
+                    AnimationResult(
+                        topic_index=topic_idx,
+                        topic_name=topic_name,
+                        success=True,
+                        video_path=video_path,
+                        scene_code=scene_code,
+                        iterations=iteration,
+                    )
+                )
             else:
                 if on_progress:
                     on_progress(topic_idx, iteration, f"Failed after {iteration} iterations")
-                results.append(AnimationResult(
-                    topic_index=topic_idx, topic_name=topic_name, success=False,
-                    scene_code=scene_code, error_message=manim_result.stderr if manim_result else "Unknown error",
-                    iterations=iteration,
-                ))
+                results.append(
+                    AnimationResult(
+                        topic_index=topic_idx,
+                        topic_name=topic_name,
+                        success=False,
+                        scene_code=scene_code,
+                        error_message=manim_result.stderr if manim_result else "Unknown error",
+                        iterations=iteration,
+                    )
+                )
 
         return results
 
@@ -490,15 +506,22 @@ class Paper2SimAnimationClient:
             if on_progress:
                 on_progress(topic_index, iteration, f"Success! Video saved to {video_path}")
             return AnimationResult(
-                topic_index=topic_index, topic_name=topic_name, success=True,
-                video_path=video_path, scene_code=scene_code, iterations=iteration,
+                topic_index=topic_index,
+                topic_name=topic_name,
+                success=True,
+                video_path=video_path,
+                scene_code=scene_code,
+                iterations=iteration,
             )
         else:
             if on_progress:
                 on_progress(topic_index, iteration, f"Failed after {iteration} iterations")
             return AnimationResult(
-                topic_index=topic_index, topic_name=topic_name, success=False,
-                scene_code=scene_code, error_message=manim_result.stderr if manim_result else "Unknown error",
+                topic_index=topic_index,
+                topic_name=topic_name,
+                success=False,
+                scene_code=scene_code,
+                error_message=manim_result.stderr if manim_result else "Unknown error",
                 iterations=iteration,
             )
 

@@ -40,10 +40,10 @@ TEMPLATE_DESCRIPTIONS = {
     "convolution_1d": "1D convolution operation — params: {{signal_len, kernel_size}} (signal and kernel dimensions)",
     "softmax_distribution": "Softmax normalization — params: {{values}} (list of input values)",
     "embedding_lookup": "Embedding lookup — params: {{vocab_size, embed_dim}} (vocabulary and embedding dimensions)",
-    "loss_landscape": "Loss landscape visualization — params: {{loss_type}} (\"mse\" or \"cross_entropy\")",
+    "loss_landscape": 'Loss landscape visualization — params: {{loss_type}} ("mse" or "cross_entropy")',
     "transformer_block": "Transformer block — no params needed",
     "linear_combination": "Linear combination of vectors — params: {{num_vectors, dimension}} (number and size of vectors)",
-    "probability_distribution": "Probability distribution plot — params: {{dist_type}} (\"gaussian\" or \"uniform\")",
+    "probability_distribution": 'Probability distribution plot — params: {{dist_type}} ("gaussian" or "uniform")',
 }
 
 
@@ -57,9 +57,7 @@ def format_mapping_prompt(equations: list[dict]) -> str:
         Complete prompt string ready for LLM submission.
     """
     # Build template description block
-    template_descriptions = "\n".join(
-        f"- **{name}**: {desc}" for name, desc in TEMPLATE_DESCRIPTIONS.items()
-    )
+    template_descriptions = "\n".join(f"- **{name}**: {desc}" for name, desc in TEMPLATE_DESCRIPTIONS.items())
 
     # Build equation list
     equation_lines = []

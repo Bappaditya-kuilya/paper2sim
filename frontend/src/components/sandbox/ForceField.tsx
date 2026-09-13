@@ -1,5 +1,4 @@
-import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useMemo } from 'react';
 import * as THREE from 'three';
 
 export interface ForceFieldProps {
@@ -11,7 +10,6 @@ export interface ForceFieldProps {
 }
 
 function Arrow({ origin, direction, color, scale }: { origin: THREE.Vector3; direction: THREE.Vector3; color: string; scale: number }) {
-  const arrowRef = useRef<THREE.ArrowHelper>(null);
   const dir = direction.clone().normalize();
   const length = direction.length() * scale;
 
@@ -21,7 +19,7 @@ function Arrow({ origin, direction, color, scale }: { origin: THREE.Vector3; dir
 }
 
 export function ForceField({
-  expression = 'F = ma',
+  expression: _expression,
   mass = 1,
   acceleration = 9.81,
   gridSize = 5,

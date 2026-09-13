@@ -98,7 +98,9 @@ Write clearly enough that an animator could recreate it. Be specific about what'
 - Guide the viewer's attention ("Notice how...", "The key insight is...")
 - Avoid mathematical notation - spell out equations in words
 
-Return ONLY a JSON object with this structure: {"topic_name": "...", "visual_concept": "...", "scenes": [{"scene_type": "hook|mid|closing", "title": "...", "visual_description": "...", "narration": "..."}]}"""
+Return ONLY a JSON object with this structure:
+{"topic_name": "...", "visual_concept": "...", "scenes": [{"scene_type": "hook|mid|closing",
+"title": "...", "visual_description": "...", "narration": "..."}]}"""
 
 
 def format_topic_input(topic) -> str:
@@ -110,9 +112,4 @@ def format_topic_input(topic) -> str:
     Returns:
         A formatted string ready to append to the storyboard prompt.
     """
-    return (
-        "# Create a storyboard for the following topic:\n"
-        "## AtomicTopic Input\n\n"
-        f"{topic.to_text()}\n"
-    )
-
+    return f"# Create a storyboard for the following topic:\n## AtomicTopic Input\n\n{topic.to_text()}\n"

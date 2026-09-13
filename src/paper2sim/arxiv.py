@@ -7,9 +7,8 @@ and fetch paper metadata from the arXiv Atom API.
 import io
 import re
 import tarfile
-import tempfile
-import urllib.request
 import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
