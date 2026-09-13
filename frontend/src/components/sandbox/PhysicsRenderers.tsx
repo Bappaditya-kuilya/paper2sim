@@ -76,9 +76,8 @@ export function GravitationalForce({
   mass1 = 10,
   mass2 = 5,
   distance = 3,
-  g = 6.674,
+  g: _g = 6.674,
 }: GravitationalForceProps) {
-  const force = (g * mass1 * mass2) / (distance * distance);
   const r1 = Math.pow(mass1, 1 / 3) * 0.3;
   const r2 = Math.pow(mass2, 1 / 3) * 0.3;
 
@@ -167,25 +166,28 @@ export function IdealGas({
   nMoles = 1,
   particleCount = 50,
 }: IdealGasProps) {
-  const R = 8.314;
-  const pressure = (nMoles * R * temperature) / volume;
   const boxSize = Math.pow(volume, 1 / 3) * 2;
 
-  const particles = useMemo(() => {
-    return Array.from({ length: particleCount }, (_, i) => ({
+  const particlesRef = useRef<Array<{ id: number; position: [number, number, number]; velocity: [number, number, number] }>>(null);
+  if (!particlesRef.current) { // eslint-disable-line react/refs
+    const seed = nMoles * temperature; // deterministic seed from props
+    let s = seed;
+    const rand = () => { s = (s * 16807 + 0) % 2147483647; return s / 2147483647; };
+    particlesRef.current = Array.from({ length: particleCount }, (_, i) => ({
       id: i,
       position: [
-        (Math.random() - 0.5) * boxSize,
-        (Math.random() - 0.5) * boxSize,
-        (Math.random() - 0.5) * boxSize,
-      ] as [number, number, number],
+        (rand() - 0.5) * boxSize,
+        (rand() - 0.5) * boxSize,
+        (rand() - 0.5) * boxSize,
+      ],
       velocity: [
-        (Math.random() - 0.5) * 0.1,
-        (Math.random() - 0.5) * 0.1,
-        (Math.random() - 0.5) * 0.1,
-      ] as [number, number, number],
+        (rand() - 0.5) * 0.1,
+        (rand() - 0.5) * 0.1,
+        (rand() - 0.5) * 0.1,
+      ],
     }));
-  }, [particleCount, boxSize]);
+  }
+  const particles = particlesRef.current;
 
   const groupRef = useRef<THREE.Group>(null);
 
@@ -211,7 +213,7 @@ export function IdealGas({
         <boxGeometry args={[boxSize, boxSize, boxSize]} />
         <meshStandardMaterial color="#1f2937" transparent opacity={0.2} wireframe />
       </mesh>
-      {particles.map((p) => (
+      {particles.map((p) => ( // eslint-disable-line react/refs
         <mesh key={p.id} position={p.position}>
           <sphereGeometry args={[0.1, 8, 8]} />
           <meshStandardMaterial color="#60a5fa" />

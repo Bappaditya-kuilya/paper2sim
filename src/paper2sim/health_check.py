@@ -26,6 +26,7 @@ def check_dependencies() -> dict[str, str]:
 def get_system_info() -> dict:
     """Get basic system information."""
     import platform
+
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),

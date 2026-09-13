@@ -45,7 +45,7 @@ export function MatrixVis({
     [onEdit, matrix]
   );
 
-  const handleEditConfirm = useCallback(() => {
+  const _handleEditConfirm = useCallback(() => {
     if (editCell && onEdit) {
       const value = parseFloat(editValue);
       if (!isNaN(value)) {

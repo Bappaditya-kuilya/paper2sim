@@ -1,12 +1,10 @@
 """PDF extraction utility for Paper2Sim."""
 
-import tempfile
-from pathlib import Path
-
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """Extract text from a PDF file using PyMuPDF."""
     import fitz
+
     doc = fitz.open(pdf_path)
     text = ""
     for page in doc:

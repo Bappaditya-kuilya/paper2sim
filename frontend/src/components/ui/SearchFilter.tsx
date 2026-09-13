@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 
 export interface SearchFilterProps {
   onSearch?: (query: string) => void;
@@ -82,7 +82,7 @@ export function SearchFilter({
   );
 }
 
-export function useUrlState<T>(key: string, defaultValue: T): [T, (value: T) => void] {
+export function useUrlState<T>(key: string, defaultValue: T): [T, (value: T) => void] { // eslint-disable-line react/only-export-components
   const [state, setState] = useState<T>(() => {
     const params = new URLSearchParams(window.location.search);
     const saved = params.get(key);

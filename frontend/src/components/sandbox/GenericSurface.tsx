@@ -1,9 +1,8 @@
-import React, { useMemo, useRef, useCallback, useState } from 'react';
-import { useFrame, ThreeEvent } from '@react-three/fiber';
+import React, { useMemo, useCallback, useState } from 'react';
+import { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { generateSurface, createSurfaceGeometry, SurfaceGrid } from '../../lib/surfaceBuilder';
+import { generateSurface, createSurfaceGeometry } from '../../lib/surfaceBuilder';
 import { math } from '../../lib/mathParser';
-import { SurfaceMesh } from './Sandbox3D';
 
 export interface GenericSurfaceProps {
   expression: string;
@@ -49,13 +48,13 @@ export function GenericSurface({
         onHover?.(pos);
       }
     },
-    [onHover]
+    [onHover] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const handlePointerLeave = useCallback(() => {
     setHoverPos(null);
     onHover?.(null);
-  }, [onHover]);
+  }, [onHover]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <group>
@@ -99,10 +98,8 @@ export function ParametricSurface({
   vRange = [0, Math.PI],
   resolution = 50,
   wireframe = false,
-  onHover,
+  onHover: _onHover,
 }: ParametricSurfaceProps) {
-  const [hoverPos, setHoverPos] = useState<{ u: number; v: number; x: number; y: number; z: number } | null>(null);
-
   const geometry = useMemo(() => {
     try {
       const compiledX = math.compile(expressionX);

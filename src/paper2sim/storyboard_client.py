@@ -28,11 +28,11 @@ def generate_storyboard(topic: dict, source_text: str = "", model: str = "llama-
 
     prompt = f"""Create an animation storyboard for explaining this mathematical topic.
 
-Topic: {topic.get('name', 'Unknown')}
-Description: {topic.get('description', '')}
-Equations: {json.dumps(topic.get('equations', []))}
+Topic: {topic.get("name", "Unknown")}
+Description: {topic.get("description", "")}
+Equations: {json.dumps(topic.get("equations", []))}
 
-{f'Context from paper: {source_text[:500]}' if source_text else ''}
+{f"Context from paper: {source_text[:500]}" if source_text else ""}
 
 Generate a sequence of animation scenes. Each scene should have:
 - title: scene name

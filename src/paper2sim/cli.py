@@ -1,8 +1,8 @@
 """CLI for paper2sim — extract equations and render 3D visualizations."""
 
-import typer
 from pathlib import Path
-from typing import Optional
+
+import typer
 
 app = typer.Typer(
     name="paper2sim",
@@ -13,9 +13,9 @@ app = typer.Typer(
 
 @app.command()
 def extract(
-    url: Optional[str] = typer.Option(None, "--url", "-u", help="arXiv URL to extract from"),
-    equation: Optional[str] = typer.Option(None, "--equation", "-e", help="Plain text equation"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
+    url: str | None = typer.Option(None, "--url", "-u", help="arXiv URL to extract from"),
+    equation: str | None = typer.Option(None, "--equation", "-e", help="Plain text equation"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output file path"),
     format: str = typer.Option("json", "--format", "-f", help="Output format (json, text)"),
 ):
     """Extract equations from a paper or text."""
@@ -32,6 +32,7 @@ def extract(
             "source": "text",
         }
     else:
+        assert url is not None
         typer.echo(f"Extracting from {url}...")
         result = {
             "equations": [],
@@ -50,7 +51,7 @@ def extract(
 def render(
     equation: str = typer.Option(..., "--equation", "-e", help="Equation to render"),
     model: str = typer.Option("auto", "--model", "-m", help="Model type (auto, trigonometric, polynomial, etc.)"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output directory"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output directory"),
 ):
     """Render an equation as a 3D visualization."""
     from paper2sim.equations import classify_equation
@@ -80,6 +81,7 @@ def serve(
 ):
     """Start the API server."""
     import uvicorn
+
     typer.echo(f"Starting server on {host}:{port}...")
     uvicorn.run("paper2sim.api:app", host=host, port=port, reload=reload)
 

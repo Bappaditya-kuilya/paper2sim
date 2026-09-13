@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import * as THREE from 'three';
 
 export interface DistChartProps {
   type: 'gaussian' | 'binomial' | 'poisson' | 'uniform';

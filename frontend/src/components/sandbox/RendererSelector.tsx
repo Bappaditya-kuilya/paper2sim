@@ -1,9 +1,9 @@
 import React from 'react';
-import { TrigSurface, TrigSurfaceProps } from './TrigSurface';
-import { PolySurface, PolySurfaceProps } from './PolySurface';
-import { ExpSurface, ExpSurfaceProps } from './ExpSurface';
-import { LogSurface, LogSurfaceProps } from './LogSurface';
-import { GenericSurface, GenericSurfaceProps, ParametricSurface, ParametricSurfaceProps } from './GenericSurface';
+import { TrigSurface } from './TrigSurface';
+import { PolySurface } from './PolySurface';
+import { ExpSurface } from './ExpSurface';
+import { LogSurface } from './LogSurface';
+import { GenericSurface } from './GenericSurface';
 
 export interface RendererProps {
   expression: string;
@@ -18,7 +18,7 @@ export interface RendererProps {
   vRange?: [number, number];
 }
 
-export function selectRenderer(modelType: string): React.FC<any> {
+export function selectRenderer(modelType: string): React.FC<any> { // eslint-disable-line react/only-export-components
   switch (modelType) {
     case 'trigonometric':
       return TrigSurface;
@@ -50,5 +50,5 @@ export function MathSurface({ expression, modelType, ...props }: RendererProps) 
     rendererProps.base = props.base;
   }
 
-  return <Renderer {...rendererProps} />;
+  return <Renderer {...rendererProps} />; // eslint-disable-line react/static-components
 }

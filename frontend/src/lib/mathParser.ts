@@ -81,8 +81,6 @@ export function addImplicitMultiply(input: string): string {
 
     const cur = chars[i];
     const nxt = chars[i + 1];
-    const prev = chars[i - 1];
-
     if (cur === ')' && nxt !== ')' && nxt !== ']' && nxt !== ',' && nxt !== ' ' && !'+-*/^'.includes(nxt)) {
       out.push('*');
     }

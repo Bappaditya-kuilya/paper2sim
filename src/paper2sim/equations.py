@@ -8,18 +8,17 @@ import json
 import os
 import re
 
-
 EXTRACT_EQUATIONS_PROMPT = """Extract the key mathematical equations from this paper text. For each equation:
 1. Rewrite it in clean LaTeX notation
 2. Classify it as: matrix, sum, integral, equation, inequality, function_def, or unknown
-3. Assign a template if applicable: matrix_multiply, attention_heatmap, gradient_descent, convolution_1d, softmax_distribution, embedding_lookup, loss_landscape, transformer_block, linear_combination, probability_distribution
+3. Assign a template if applicable: matrix_multiply, attention_heatmap, gradient_descent,
+   convolution_1d, softmax_distribution, embedding_lookup, loss_landscape, transformer_block,
+   linear_combination, probability_distribution
 
 Return a JSON array:
 [{"latex": "...", "label": "...", "type": "display", "template": "template_name_or_null", "params": {}, "importance": "high|medium|low"}]
 
 Focus on the 5-10 most important equations. Return ONLY valid JSON, no markdown."""
-
-
 
 
 def extract_equations_from_tex(tex_content: str) -> list[dict[str, str]]:
@@ -34,44 +33,52 @@ def extract_equations_from_tex(tex_content: str) -> list[dict[str, str]]:
     for m in re.finditer(r"\\begin\{equation\}.*?\\end\{equation\}", tex_content, re.DOTALL):
         label = _extract_label(tex_content, m.start())
         eq_text = m.group(0)
-        equations.append({
-            "latex": eq_text,
-            "label": label,
-            "type": "display",
-            "position": m.start(),
-        })
+        equations.append(
+            {
+                "latex": eq_text,
+                "label": label,
+                "type": "display",
+                "position": m.start(),
+            }
+        )
 
     # Display: \[...\]
     for m in re.finditer(r"\\\[(.+?)\\\]", tex_content, re.DOTALL):
         label = _extract_label(tex_content, m.start())
-        equations.append({
-            "latex": m.group(0),
-            "label": label,
-            "type": "display",
-            "position": m.start(),
-        })
+        equations.append(
+            {
+                "latex": m.group(0),
+                "label": label,
+                "type": "display",
+                "position": m.start(),
+            }
+        )
 
     # Display: $$...$$
     for m in re.finditer(r"\$\$(.+?)\$\$", tex_content, re.DOTALL):
         label = _extract_label(tex_content, m.start())
-        equations.append({
-            "latex": m.group(0),
-            "label": label,
-            "type": "display",
-            "position": m.start(),
-        })
+        equations.append(
+            {
+                "latex": m.group(0),
+                "label": label,
+                "type": "display",
+                "position": m.start(),
+            }
+        )
 
     # Inline: $...$ — only if it looks like math
     for m in re.finditer(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", tex_content):
         candidate = m.group(1)
         if _looks_like_math(candidate):
             label = _extract_label(tex_content, m.start())
-            equations.append({
-                "latex": m.group(0),
-                "label": label,
-                "type": "inline",
-                "position": m.start(),
-            })
+            equations.append(
+                {
+                    "latex": m.group(0),
+                    "label": label,
+                    "type": "inline",
+                    "position": m.start(),
+                }
+            )
 
     return equations
 
@@ -100,12 +107,14 @@ def extract_equations_from_text(text: str) -> list[dict[str, str]]:
         if not line or _is_garbage(line):
             continue
         if _line_has_math(line):
-            equations.append({
-                "latex": line,
-                "label": None,
-                "type": "inferred",
-                "position": text.find(line),
-            })
+            equations.append(
+                {
+                    "latex": line,
+                    "label": None,
+                    "type": "inferred",
+                    "position": text.find(line),
+                }
+            )
     return equations
 
 
@@ -185,7 +194,7 @@ def _is_garbage(text: str) -> bool:
     if len(text) > 0 and non_ascii / len(text) > 0.1:
         return True
     # Must contain at least one ASCII letter or common LaTeX char
-    if not re.search(r'[a-zA-Z=+\-*/^_{}\\]', text):
+    if not re.search(r"[a-zA-Z=+\-*/^_{}\\]", text):
         return True
     return False
 
@@ -225,11 +234,13 @@ def select_templates(equations: list[dict[str, str]]) -> list[dict[str, str | di
     for eq in equations:
         eq_type = classify_equation(eq["latex"])
         template = _template_for_type(eq_type, eq["latex"])
-        results.append({
-            "equation": eq["latex"],
-            "template": template or "",
-            "params": {},
-        })
+        results.append(
+            {
+                "equation": eq["latex"],
+                "template": template or "",
+                "params": {},
+            }
+        )
     return results
 
 

@@ -8,7 +8,10 @@ and the function to format storyboard prompts for LLM input.
 MANIM_CODING_AGENT_PROMPT = """You are an Expert Manim Animator creating detailed educational videos with access to documentation and a workspace.
 
 ## Your Goal
-Complete the `./animation_workspace/scene.py` file with Manim code that implements all the requested animations in a single Scene class. Your animations should be **rich, detailed, and educational** — not simple or abstract. Target approximately **5 minutes of video content** with thorough explanations and smooth pacing.
+Complete the `./animation_workspace/scene.py` file with Manim code that implements all the
+requested animations in a single Scene class. Your animations should be **rich, detailed, and
+**educational** — not simple or abstract. Target approximately **5 minutes of video content**
+with thorough explanations and smooth pacing.
 
 ## Workspace Structure
 You have access to two folders:
@@ -113,7 +116,9 @@ Before finalizing your code, verify:
 - [ ] Mathematical formulas appear alongside their visual representations
 - [ ] Transitions between scenes are smooth (FadeOut/FadeIn)
 
-Remember: ALWAYS use your tools to research the documentation before writing code. Complete `./animation_workspace/scene.py` by adding your Scene class with all animations below the existing boilerplate."""
+Remember: ALWAYS use your tools to research the documentation before writing code. Complete
+`./animation_workspace/scene.py` by adding your Scene class with all animations below the
+existing boilerplate."""
 
 SCENE_BOILERPLATE = """# The videos are meant to be in vertical format (1080*1920, portrait orientation).
 # Manually set the frame size, height, and width to ensure the scene is rendered correctly.
@@ -133,12 +138,12 @@ def format_storyboard_prompt(
     topic_index: int,
 ) -> str:
     """Format the storyboard into a prompt for the animation agent.
-    
+
     Args:
         breakdown: The Breakdown object containing all topics.
         storyboard: The TopicStoryboard for this specific topic.
         topic_index: Index of the current topic in the breakdown.
-        
+
     Returns:
         Formatted prompt string for the animation agent.
     """
@@ -150,8 +155,8 @@ def format_storyboard_prompt(
     # Convert storyboard scenes to text
     storyboard_text = ""
     for i, scene in enumerate(storyboard.scenes):
-        storyboard_text += f"## Scene {i+1}\n"
-        storyboard_text += scene.to_text() + '\n'
+        storyboard_text += f"## Scene {i + 1}\n"
+        storyboard_text += scene.to_text() + "\n"
 
     # Build series context
     series_context = f"""# Document Context
@@ -195,8 +200,8 @@ This is **Part {topic_index + 1} of {total_topics}** in the series on "{breakdow
         topic_context += f"- {takeaway}\n"
 
     # Get topic name for caption
-    topic_name_short = storyboard.topic_name.split(':')[0] if ':' in storyboard.topic_name else storyboard.topic_name
-    
+    topic_name_short = storyboard.topic_name.split(":")[0] if ":" in storyboard.topic_name else storyboard.topic_name
+
     # Build next topic preview section
     next_preview = ""
     if next_topic:
@@ -236,4 +241,3 @@ After the last storyboard scene, add a closing sequence:
 7. The closing should tease the next topic to encourage continued viewing
 """
     return storyboard_prompt
-
