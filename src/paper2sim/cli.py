@@ -1,43 +1,91 @@
-"""Paper2Sim CLI — command-line interface for extraction and rendering."""
+"""CLI for paper2sim — extract equations and render 3D visualizations."""
 
-import argparse
-import json
-import sys
+import typer
+from pathlib import Path
+from typing import Optional
+
+app = typer.Typer(
+    name="paper2sim",
+    help="Extract equations from papers and visualize them interactively",
+    no_args_is_help=True,
+)
+
+
+@app.command()
+def extract(
+    url: Optional[str] = typer.Option(None, "--url", "-u", help="arXiv URL to extract from"),
+    equation: Optional[str] = typer.Option(None, "--equation", "-e", help="Plain text equation"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
+    format: str = typer.Option("json", "--format", "-f", help="Output format (json, text)"),
+):
+    """Extract equations from a paper or text."""
+    from paper2sim.equations import classify_equation
+
+    if not url and not equation:
+        typer.echo("Error: Provide either --url or --equation", err=True)
+        raise typer.Exit(1)
+
+    if equation:
+        eq_type = classify_equation(equation)
+        result = {
+            "equations": [{"latex": equation, "type": eq_type}],
+            "source": "text",
+        }
+    else:
+        typer.echo(f"Extracting from {url}...")
+        result = {
+            "equations": [],
+            "source": url,
+            "status": "url_extraction_not_implemented",
+        }
+
+    if output:
+        output.write_text(str(result))
+        typer.echo(f"Saved to {output}")
+    else:
+        typer.echo(str(result))
+
+
+@app.command()
+def render(
+    equation: str = typer.Option(..., "--equation", "-e", help="Equation to render"),
+    model: str = typer.Option("auto", "--model", "-m", help="Model type (auto, trigonometric, polynomial, etc.)"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output directory"),
+):
+    """Render an equation as a 3D visualization."""
+    from paper2sim.equations import classify_equation
+
+    if model == "auto":
+        model = classify_equation(equation)
+
+    typer.echo(f"Rendering {equation} as {model}...")
+    typer.echo("Note: 3D rendering requires the web frontend")
+
+
+@app.command()
+def models():
+    """List available model types."""
+    from paper2sim.model_registry import list_models
+
+    available = list_models()
+    for model in available:
+        typer.echo(f"  {model['type']}: {model['renderer']}")
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port to listen on"),
+    reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload"),
+):
+    """Start the API server."""
+    import uvicorn
+    typer.echo(f"Starting server on {host}:{port}...")
+    uvicorn.run("paper2sim.api:app", host=host, port=port, reload=reload)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Paper2Sim — extract and visualize equations")
-    sub = parser.add_subparsers(dest="command")
-
-    extract = sub.add_parser("extract", help="Extract equations from a source")
-    extract.add_argument("source", choices=["arxiv", "text", "pdf"])
-    extract.add_argument("--url", help="arXiv URL")
-    extract.add_argument("--text", help="Plain text equation")
-    extract.add_argument("--pdf", help="Path to PDF file")
-
-    render = sub.add_parser("render", help="Render an equation")
-    render.add_argument("equation", help="Equation to render")
-    render.add_argument("--template", default="generic", help="Template name")
-    render.add_argument("--output", default="output.mp4", help="Output path")
-
-    args = parser.parse_args()
-
-    if args.command == "extract":
-        if args.source == "arxiv" and args.url:
-            from paper2sim.arxiv import parse_arxiv_url
-            arxiv_id = parse_arxiv_url(args.url)
-            print(json.dumps({"arxiv_id": arxiv_id}, indent=2))
-        elif args.source == "text" and args.text:
-            from paper2sim.equations import classify_equation
-            eq_type = classify_equation(args.text)
-            print(json.dumps({"equation": args.text, "type": eq_type}, indent=2))
-        else:
-            parser.print_help()
-            sys.exit(1)
-    elif args.command == "render":
-        print(json.dumps({"equation": args.equation, "template": args.template, "output": args.output}, indent=2))
-    else:
-        parser.print_help()
+    app()
 
 
 if __name__ == "__main__":

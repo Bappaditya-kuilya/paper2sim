@@ -16,7 +16,7 @@ class ParamSchema:
     step: float
 
 
-MODELS = {
+MODELS: dict[str, dict[str, str | list[ParamSchema]]] = {
     "trigonometric": {
         "renderer": "TrigSurface",
         "params": [
@@ -89,4 +89,4 @@ def get_model(model_type: str) -> dict | None:
 
 def list_models() -> list[dict]:
     """List all available models."""
-    return [{"type": k, "renderer": v["renderer"], "params": [p.name for p in v["params"]]} for k, v in MODELS.items()]
+    return [{"type": k, "renderer": v["renderer"], "params": [p.name for p in v["params"] if isinstance(p, ParamSchema)]} for k, v in MODELS.items()]
