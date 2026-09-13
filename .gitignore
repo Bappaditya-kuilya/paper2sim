@@ -250,3 +250,5 @@ fly.md
 .scratch/
 .vercel
 .env*
+node_modules/
+test-results/

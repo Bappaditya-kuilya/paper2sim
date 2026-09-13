@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import * as THREE from 'three';
 
 export interface MatrixVisProps {
@@ -19,7 +19,6 @@ export function MatrixVis({
   vector = [1, 0, 0],
 }: MatrixVisProps) {
   const [editCell, setEditCell] = useState<{ row: number; col: number } | null>(null);
-  const [editValue, setEditValue] = useState('');
 
   const rows = matrix.length;
   const cols = matrix[0]?.length || 0;
@@ -39,21 +38,10 @@ export function MatrixVis({
     (row: number, col: number) => {
       if (onEdit) {
         setEditCell({ row, col });
-        setEditValue(String(matrix[row][col]));
       }
     },
     [onEdit, matrix]
   );
-
-  const _handleEditConfirm = useCallback(() => {
-    if (editCell && onEdit) {
-      const value = parseFloat(editValue);
-      if (!isNaN(value)) {
-        onEdit(editCell.row, editCell.col, value);
-      }
-    }
-    setEditCell(null);
-  }, [editCell, editValue, onEdit]);
 
   return (
     <group position={[-totalWidth / 2, -totalHeight / 2, 0]}>
@@ -87,7 +75,7 @@ export function MatrixVis({
       )}
       {showDotProduct && dotProduct && (
         <group position={[totalWidth + 0.5, 0, 0]}>
-          {dotProduct.map((val, i) => (
+          {dotProduct.map((_dpVal, i) => (
             <group key={i} position={[0, (rows - 1 - i) * (cellSize + gap), 0]}>
               <mesh>
                 <boxGeometry args={[cellSize * 0.6, cellSize * 0.6, 0.1]} />
