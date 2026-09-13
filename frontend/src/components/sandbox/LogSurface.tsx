@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { generateSurface, createSurfaceGeometry } from '../../lib/surfaceBuilder';
 import { SurfaceMesh } from './Sandbox3D';
 

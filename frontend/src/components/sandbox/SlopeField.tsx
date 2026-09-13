@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
+import { Line } from '@react-three/drei';
 
 export interface SlopeFieldProps {
   expression: string;
@@ -95,21 +96,14 @@ export function SlopeField({
   return (
     <group>
       {segments.map((seg, i) => {
-        const points = [seg.start, seg.end];
-        const geo = new THREE.BufferGeometry().setFromPoints(points);
         return (
-          <line key={`seg-${i}`} geometry={geo}>
-            <lineBasicMaterial color={seg.color} />
-          </line>
+          <Line key={`seg-${i}`} points={[seg.start, seg.end]} color={seg.color} lineWidth={1} />
         );
       })}
       {solutionCurves.map((curve, i) => {
         if (curve.points.length < 2) return null;
-        const geo = new THREE.BufferGeometry().setFromPoints(curve.points);
         return (
-          <line key={`curve-${i}`} geometry={geo}>
-            <lineBasicMaterial color={curve.color} linewidth={2} />
-          </line>
+          <Line key={`curve-${i}`} points={curve.points} color={curve.color} lineWidth={2} />
         );
       })}
       {initialConditions.map((ic, i) => (

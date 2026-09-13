@@ -11,6 +11,7 @@ vi.mock('@react-three/drei', () => ({
   OrbitControls: () => null,
   Grid: () => null,
   AxesHelper: () => null,
+  Line: () => null,
 }));
 
 import { SlopeField } from '../components/sandbox/SlopeField';

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 
 export interface DistChartProps {
   type: 'gaussian' | 'binomial' | 'poisson' | 'uniform';

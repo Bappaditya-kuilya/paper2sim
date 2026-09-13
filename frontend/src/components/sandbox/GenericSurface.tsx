@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback, useState } from 'react';
-import { ThreeEvent } from '@react-three/fiber';
+import { useMemo, useCallback, useState } from 'react';
+import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { generateSurface, createSurfaceGeometry } from '../../lib/surfaceBuilder';
 import { math } from '../../lib/mathParser';
