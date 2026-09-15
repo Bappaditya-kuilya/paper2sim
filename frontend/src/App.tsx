@@ -7,6 +7,7 @@ import { PaperInput } from './components/PaperInput'
 import { EquationList } from './components/EquationList'
 import { ProgressTracker } from './components/ProgressTracker'
 import { Sandbox3D, MathSurface } from './components/sandbox'
+import { EquationInfo } from './components/EquationInfo'
 import { SettingsPanel } from './components/ui/ExportMenu'
 import { classifyExpression } from './lib/mathParser'
 import { showToast } from './components/Toast'
@@ -86,9 +87,9 @@ export default function App() {
               />
             </div>
           ) : activeView === 'render' && renderingEquation ? (
-            <div className="flex h-full flex-col space-y-4">
+            <div className="mx-auto max-w-4xl space-y-6">
               <div className="flex items-center justify-between">
-                <p className="font-mono text-xs text-zinc-500">{renderingEquation.latex}</p>
+                <h2 className="text-sm font-medium text-zinc-400">Equation Details</h2>
                 <button
                   onClick={() => setActiveView('extract')}
                   className="text-xs text-zinc-500 hover:text-zinc-300"
@@ -96,14 +97,20 @@ export default function App() {
                   Back to equations
                 </button>
               </div>
-              <div className="flex-1 min-h-0">
-                <Sandbox3D>
-                  <MathSurface
-                    expression={renderingEquation.latex}
-                    modelType={modelType}
-                  />
-                </Sandbox3D>
-              </div>
+              <EquationInfo equation={renderingEquation} />
+              {renderingEquation.vizMode === '3d' && (
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-400 mb-3">Interactive 3D</h3>
+                  <div className="h-96">
+                    <Sandbox3D>
+                      <MathSurface
+                        expression={renderingEquation.latex}
+                        modelType={modelType}
+                      />
+                    </Sandbox3D>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mx-auto max-w-4xl space-y-6">
