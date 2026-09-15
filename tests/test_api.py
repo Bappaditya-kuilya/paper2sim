@@ -52,43 +52,6 @@ def test_extract_text_classifies_equation():
     assert data["equations"][0]["type"] in ("polynomial", "unknown")
 
 
-def test_render_returns_job_id():
-    response = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    assert response.status_code == 200
-    data = response.json()
-    assert "job_id" in data
-    assert data["status"] == "queued"
-
-
-def test_render_requires_template():
-    response = client.post("/api/render", json={"equation": "sin(x)"})
-    assert response.status_code == 422
-
-
-def test_render_status_returns_job():
-    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    job_id = create.json()["job_id"]
-    response = client.get(f"/api/render/{job_id}/status")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["job_id"] == job_id
-    assert data["status"] == "queued"
-
-
-def test_render_status_not_found():
-    response = client.get("/api/render/nonexistent/status")
-    assert response.status_code == 200
-    assert "error" in response.json()
-
-
-def test_render_video_not_ready():
-    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    job_id = create.json()["job_id"]
-    response = client.get(f"/api/render/{job_id}/video")
-    assert response.status_code == 200
-    assert "error" in response.json()
-
-
 def test_breakdown_returns_error():
     response = client.post("/api/breakdown", json={"text": "test"})
     assert response.status_code == 200
@@ -112,13 +75,6 @@ def test_health_deps_returns_status():
 def test_validation_error_returns_422():
     response = client.post("/api/extract", json={"invalid": "data"})
     assert response.status_code == 422
-
-
-def test_render_stream_returns_event_stream():
-    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    job_id = create.json()["job_id"]
-    response = client.get(f"/api/render/{job_id}/stream")
-    assert response.status_code == 200
 
 
 def test_breakdown_calls_client():

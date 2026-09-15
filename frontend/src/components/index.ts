@@ -4,7 +4,6 @@ export { MainContent } from './MainContent';
 export { PaperInput } from './PaperInput';
 export { EquationCard } from './EquationCard';
 export { EquationList } from './EquationList';
-export { VideoPlayer } from './VideoPlayer';
 export { ProgressTracker } from './ProgressTracker';
 export { ErrorToast, showError } from './ErrorToast';
 export { showToast } from './Toast';

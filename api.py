@@ -18,7 +18,6 @@ from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse
 from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
 from paper2sim.breakdown_client import breakdown_equations
 from paper2sim.storyboard_client import generate_storyboard
-from workers import create_job, get_job, jobs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,17 +41,6 @@ class Equation(BaseModel):
 class ExtractResponse(BaseModel):
     equations: list[Equation]
     paper_info: dict | None = None
-
-
-class RenderRequest(BaseModel):
-    template: str
-    params: dict = {}
-    equation: str
-
-
-class RenderResponse(BaseModel):
-    job_id: str
-    status: str
 
 
 class BreakdownRequest(BaseModel):
@@ -168,35 +156,6 @@ async def extract(req: ExtractRequest, request: Request):
     return {"error": "Invalid request"}
 
 
-@app.post("/api/render", response_model=RenderResponse)
-async def render(req: RenderRequest):
-    job_id = create_job(req.template, req.params, req.equation)
-    return RenderResponse(job_id=job_id, status="queued")
-
-
-@app.get("/api/render/{job_id}/status")
-async def render_status(job_id: str):
-    job = get_job(job_id)
-    if not job:
-        return {"error": "Job not found"}
-    return {
-        "job_id": job["job_id"],
-        "status": job["status"],
-        "progress": job["progress"],
-        "error": job["error"],
-    }
-
-
-@app.get("/api/render/{job_id}/video")
-async def render_video(job_id: str):
-    job = get_job(job_id)
-    if not job:
-        return {"error": "Job not found"}
-    if job["status"] != "complete":
-        return {"error": "Video not ready"}
-    return {"video_path": job["video_path"]}
-
-
 @app.post("/api/breakdown")
 async def breakdown(req: BreakdownRequest):
     equations = [{"latex": req.text or "", "type": "unknown"}]
@@ -242,20 +201,6 @@ async def extract_upload(file: UploadFile = File(...)):
         return {"error": f"PDF extraction failed: {e}"}
     finally:
         Path(tmp_path).unlink(missing_ok=True)
-
-
-@app.get("/api/render/{job_id}/stream")
-async def render_stream(job_id: str):
-    """SSE stream for render progress updates."""
-    from fastapi.responses import StreamingResponse
-
-    async def event_generator():
-        job = get_job(job_id)
-        if not job:
-            yield f"data: {JSONResponse(content={'error': 'Job not found'}).body.decode()}\n\n"
-            return
-        yield f"data: {JSONResponse(content={'status': job['status'], 'progress': job['progress']}).body.decode()}\n\n"
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.exception_handler(ValidationError)
