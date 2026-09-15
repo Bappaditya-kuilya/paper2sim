@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { api, resetBackendCheck } from '../lib/api';
 import { classifyVizMode } from '../lib/vizClassifier';
-import type { Equation } from '../types';
+import type { Equation, ExtractResponse } from '../types';
 
 interface ExtractPayload {
   source: string;
   url?: string;
   text?: string;
+  file?: File;
 }
 
 export function useExtract() {
@@ -42,9 +43,37 @@ export function useExtract() {
     }
   };
 
-  const retry = () => {
-    if (lastPayload) extract(lastPayload.source, lastPayload.url, lastPayload.text);
+  const extractUpload = async (file: File) => {
+    setLoading(true);
+    setError(null);
+    setBackendDown(false);
+    setLastPayload({ source: 'pdf', file });
+    resetBackendCheck();
+    try {
+      const res = (await api.extractUpload(file)) as ExtractResponse & { error?: string };
+      if (!res.equations) throw new Error(res.error || 'Extraction failed');
+      setEquations(res.equations.map(eq => ({
+        ...eq,
+        vizMode: classifyVizMode(eq.latex, eq.type),
+      })));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Extraction failed';
+      if (msg.includes('BACKEND_OFFLINE') || msg.includes('not available')) {
+        setBackendDown(true);
+        setEquations([]);
+        setError(null);
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return { equations, loading, error, extract, retry, backendDown, setEquations };
+  const retry = () => {
+    if (lastPayload?.file) extractUpload(lastPayload.file);
+    else if (lastPayload) extract(lastPayload.source, lastPayload.url, lastPayload.text);
+  };
+
+  return { equations, loading, error, extract, extractUpload, retry, backendDown, setEquations };
 }

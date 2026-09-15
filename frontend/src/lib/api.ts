@@ -50,6 +50,21 @@ export const api = {
   extract: (body: { source: string; url?: string; text?: string }) =>
     apiFetch<ExtractResponse>('/api/extract', { method: 'POST', body: JSON.stringify(body) }),
 
+  extractUpload: async (file: File): Promise<ExtractResponse> => {
+    const available = await checkBackend();
+    if (!available) {
+      throw new AppError('Backend server is not available. Please ensure the API server is running.', 'BACKEND_OFFLINE');
+    }
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_BASE}/api/extract/upload`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new AppError(`API error ${res.status}: ${body}`, String(res.status));
+    }
+    return res.json();
+  },
+
   breakdown: (body: { text?: string; model?: string }) =>
     apiFetch<BreakdownResponse>('/api/breakdown', { method: 'POST', body: JSON.stringify(body) }),
 };
