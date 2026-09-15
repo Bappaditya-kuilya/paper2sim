@@ -20,6 +20,7 @@ export function Header({ mobileOpen = false, onToggleMobile }: HeaderProps) {
             )}
           </svg>
         </button>
+        <img src="/logo.svg" alt="Paper2Sim logo" className="h-7 w-7" />
         <span aria-label="Home" className="text-lg font-semibold text-zinc-100 tracking-tight">Paper2Sim</span>
       </div>
       <nav className="hidden md:flex items-center gap-4 text-sm text-zinc-400">
