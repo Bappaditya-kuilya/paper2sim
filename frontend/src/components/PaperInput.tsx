@@ -4,10 +4,11 @@ type InputMode = 'arxiv' | 'equation' | 'pdf'
 
 interface PaperInputProps {
   onAnalyze?: (payload: { mode: InputMode; value: string | File }) => void
+  onSample?: () => void
   loading?: boolean
 }
 
-export function PaperInput({ onAnalyze, loading = false }: PaperInputProps) {
+export function PaperInput({ onAnalyze, onSample, loading = false }: PaperInputProps) {
   const [mode, setMode] = useState<InputMode>('arxiv')
   const [arxivUrl, setArxivUrl] = useState('')
   const [equation, setEquation] = useState('')
@@ -141,6 +142,13 @@ export function PaperInput({ onAnalyze, loading = false }: PaperInputProps) {
         ) : (
           'Analyze'
         )}
+      </button>
+      <button
+        onClick={() => onSample?.()}
+        disabled={loading}
+        className="mt-2 w-full rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Use a sample — no backend needed
       </button>
     </div>
   )
