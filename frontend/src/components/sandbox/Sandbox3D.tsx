@@ -46,7 +46,7 @@ export function Sandbox3D({
     <div className="h-full w-full rounded-lg border border-zinc-800 bg-zinc-950">
       <Canvas
         camera={{ position: cameraPosition, fov: 50 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
       >
         <Scene gridVisible={gridVisible} axesVisible={axesVisible}>
           {children}
