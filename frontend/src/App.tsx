@@ -25,7 +25,7 @@ export default function App() {
   const [renderingEquation, setRenderingEquation] = useState<Equation | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
 
-  const { equations, loading: extractLoading, error: extractError, extract, retry, backendDown, setEquations } = useExtract()
+  const { equations, loading: extractLoading, error: extractError, extract, extractUpload, retry, backendDown, setEquations } = useExtract()
 
   useEffect(() => {
     if (API_BASE) {
@@ -45,11 +45,15 @@ export default function App() {
     setCurrentStep(0)
     setRenderingEquation(null)
     setActiveView('extract')
+    if (payload.mode === 'pdf' && payload.value instanceof File) {
+      extractUpload(payload.value)
+      return
+    }
     const mode = payload.mode === 'arxiv' ? 'url' : 'text'
     const url = mode === 'url' ? (payload.value as string) : undefined
     const text = mode === 'text' ? String(payload.value) : undefined
     extract(mode, url, text)
-  }, [extract])
+  }, [extract, extractUpload])
 
   const handleSample = useCallback(() => {
     setCurrentStep(1)
