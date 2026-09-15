@@ -30,24 +30,28 @@ describe('classifyVizMode', () => {
     expect(classifyVizMode('sinh(x+t)', 'hyperbolic')).toBe('3d');
   });
 
-  test('dy/dx = x + y ode → info', () => {
-    expect(classifyVizMode('dy/dx = x + y', 'ode')).toBe('info');
+  test('dy/dx = x + y ode → 3d (SlopeField canvas)', () => {
+    expect(classifyVizMode('dy/dx = x + y', 'ode')).toBe('3d');
   });
 
-  test('E = mc^2 physics → info', () => {
-    expect(classifyVizMode('E = mc^2', 'physics')).toBe('info');
+  test('E = mc^2 physics → 3d (ForceField canvas)', () => {
+    expect(classifyVizMode('E = mc^2', 'physics')).toBe('3d');
   });
 
-  test('matrix A matrix → info', () => {
-    expect(classifyVizMode('matrix A', 'matrix')).toBe('info');
+  test('matrix A matrix → 3d (MatrixVis canvas)', () => {
+    expect(classifyVizMode('matrix A', 'matrix')).toBe('3d');
   });
 
-  test('P(A|B) probability → info', () => {
-    expect(classifyVizMode('P(A|B)', 'probability')).toBe('info');
+  test('P(A|B) probability → 3d (ProbDiagram canvas)', () => {
+    expect(classifyVizMode('P(A|B)', 'probability')).toBe('3d');
   });
 
-  test('mean(x) statistical → info', () => {
-    expect(classifyVizMode('mean(x)', 'statistical')).toBe('info');
+  test('mean(x) statistical → 3d (DistChart canvas)', () => {
+    expect(classifyVizMode('mean(x)', 'statistical')).toBe('3d');
+  });
+
+  test('sinh(x) hyperbolic single-var → 3d (GenericSurface canvas)', () => {
+    expect(classifyVizMode('sinh(x)', 'hyperbolic')).toBe('3d');
   });
 
   test('\\int f(x)dx calculus → info', () => {
