@@ -5,6 +5,7 @@ interface Equation {
   latex: string
   type: string
   template?: string
+  vizMode?: '3d' | 'info'
 }
 
 interface EquationListProps {
@@ -57,6 +58,7 @@ export function EquationList({ equations, loading, onSelect }: EquationListProps
           latex={eq.latex}
           type={eq.type}
           template={eq.template}
+          vizMode={eq.vizMode}
           onSelect={() => onSelect(eq)}
         />
       ))}
