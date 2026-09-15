@@ -9,6 +9,7 @@ import { ProbDiagram } from './ProbDiagram';
 import { DistChart } from './DistChart';
 import { SlopeField } from './SlopeField';
 import { ForceField } from './ForceField';
+import { TrajectoryRenderer } from './TrajectoryRenderer';
 
 export interface RendererProps {
   expression: string;
@@ -45,6 +46,8 @@ export function selectRenderer(modelType: string): React.FC<any> { // eslint-dis
       return SlopeField;
     case 'physics':
       return ForceField;
+    case 'trajectory':
+      return TrajectoryRenderer;
     default:
       return GenericSurface;
   }

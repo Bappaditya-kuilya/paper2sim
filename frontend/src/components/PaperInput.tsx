@@ -112,7 +112,7 @@ export function PaperInput({ onAnalyze, onSample, loading = false }: PaperInputP
           ) : (
             <>
               <span className="text-sm text-zinc-400">Drop a PDF here or click to browse</span>
-              <span className="text-xs text-zinc-600">Max 50MB</span>
+              <span className="text-xs text-zinc-600">Max 20MB</span>
             </>
           )}
           <input
