@@ -37,7 +37,7 @@ def _groq(system: str, user: str, max_tokens: int) -> str:
     key = os.environ.get("GROQ_API_KEY", "")
     if not key:
         raise RuntimeError("no groq key")
-    model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+    model = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
     return _post(
         GROQ_URL,
         {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},

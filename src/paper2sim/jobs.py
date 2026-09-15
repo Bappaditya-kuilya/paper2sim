@@ -5,6 +5,7 @@ Jobs are JSON records keyed by 12-char id. Same file also holds the
 """
 
 import json
+import math
 import os
 import sqlite3
 import threading
@@ -65,6 +66,19 @@ def new_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+def sanitize(obj: object) -> object:
+    """Store-time guard: NaN/Inf and raw control chars produce JSON that strict parsers (e.g. JS) reject."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, str):
+        return "".join(c for c in obj if (c >= " " and not 0xD800 <= ord(c) <= 0xDFFF) or c in "\n\t\r")
+    if isinstance(obj, list):
+        return [sanitize(x) for x in obj[:50000]]
+    if isinstance(obj, dict):
+        return {k: sanitize(v) for k, v in list(obj.items())[:500]}
+    return obj
+
+
 def create(source_kind: str, source_ref: str = "", title: str = "", upload_path: str = "") -> dict:
     _ensure()
     job: dict = {
@@ -79,7 +93,7 @@ def create(source_kind: str, source_ref: str = "", title: str = "", upload_path:
         try:
             import time as _t
 
-            conn.execute("INSERT INTO jobs (id, data, created) VALUES (?, ?, ?)", (job["id"], json.dumps(job), _t.time()))
+            conn.execute("INSERT INTO jobs (id, data, created) VALUES (?, ?, ?)", (job["id"], json.dumps(sanitize(job)), _t.time()))
             conn.commit()
         finally:
             conn.close()
@@ -106,7 +120,7 @@ def update(job_id: str, **fields) -> dict | None:
     with _lock:
         conn = _connect()
         try:
-            conn.execute("UPDATE jobs SET data = ? WHERE id = ?", (json.dumps(job), job_id))
+            conn.execute("UPDATE jobs SET data = ? WHERE id = ?", (json.dumps(sanitize(job)), job_id))
             conn.commit()
         finally:
             conn.close()

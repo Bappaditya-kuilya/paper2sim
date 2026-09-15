@@ -3,6 +3,7 @@
 Fail closed: malformed or oversized payloads raise, never reach the renderer.
 """
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -24,6 +25,13 @@ class Scene(BaseModel):
     y_range: tuple[float, float] = (-5, 5)
     resolution: int = Field(default=60, ge=8, le=200)
     extra: dict = Field(default_factory=dict)
+
+    @field_validator("coefficients")
+    @classmethod
+    def _finite_coeffs(cls, v: list[float]) -> list[float]:
+        if any(not isinstance(n, (int, float)) or not math.isfinite(n) for n in v):
+            raise ValueError("non-finite coefficient")
+        return v
 
     @field_validator("x_range", "y_range")
     @classmethod
