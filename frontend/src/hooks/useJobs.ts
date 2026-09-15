@@ -78,5 +78,18 @@ export function useJobs() {
     }
   }, []);
 
-  return { jobs, active, loading, error, backendDown, submit, open, refreshList };
+  const recheck = useCallback(async () => {
+    resetBackendCheck();
+    setBackendDown(false);
+    setError(null);
+    try {
+      setJobs((await api.listJobs()).jobs);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Load failed';
+      if (msg.includes('BACKEND_OFFLINE') || msg.includes('not available')) setBackendDown(true);
+      else setError(msg);
+    }
+  }, []);
+
+  return { jobs, active, loading, error, backendDown, submit, open, refreshList, recheck };
 }
