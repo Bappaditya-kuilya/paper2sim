@@ -24,7 +24,7 @@ export default function App() {
   const [renderingEquation, setRenderingEquation] = useState<Equation | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
 
-  const { equations, loading: extractLoading, error: extractError, extract, demoMode } = useExtract()
+  const { equations, loading: extractLoading, error: extractError, extract, retry, backendDown } = useExtract()
 
   useEffect(() => {
     if (API_BASE) {
@@ -62,14 +62,6 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col bg-zinc-900 text-zinc-100">
       <Toaster position="top-right" />
-      {demoMode && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 rounded-lg border border-yellow-700 bg-yellow-900/90 p-4 text-yellow-200 backdrop-blur">
-          <p className="text-sm">
-            <strong>Demo Mode:</strong> Backend server is not connected. Showing sample equations.
-            To use full functionality, start the backend server with <code className="rounded bg-yellow-800 px-1">python api.py</code>
-          </p>
-        </div>
-      )}
       <Header mobileOpen={mobileOpen} onToggleMobile={() => setMobileOpen((o) => !o)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -116,11 +108,26 @@ export default function App() {
             <div className="mx-auto max-w-4xl space-y-6">
               <ProgressTracker currentStep={currentStep} steps={STEPS} />
               <PaperInput onAnalyze={handleAnalyze} loading={extractLoading} />
-              <EquationList
-                equations={equations}
-                loading={extractLoading}
-                onSelect={handleSelectEquation}
-              />
+              {backendDown && !extractLoading ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-red-900/60 bg-red-950/30 py-12 text-center">
+                  <p className="text-sm font-medium text-red-200">Can&apos;t reach the analysis server</p>
+                  <p className="mt-1 max-w-md text-xs text-zinc-400">
+                    Nothing from your paper yet. The free-tier backend sleeps when idle — first load can take about a minute.
+                  </p>
+                  <button
+                    onClick={retry}
+                    className="mt-4 rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <EquationList
+                  equations={equations}
+                  loading={extractLoading}
+                  onSelect={handleSelectEquation}
+                />
+              )}
             </div>
           )}
         </MainContent>

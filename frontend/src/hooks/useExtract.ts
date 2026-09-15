@@ -3,23 +3,24 @@ import { api, resetBackendCheck } from '../lib/api';
 import { classifyVizMode } from '../lib/vizClassifier';
 import type { Equation } from '../types';
 
-const DEMO_EQUATIONS: Equation[] = [
-  { latex: 'E = mc^2', type: 'physics', template: 'ForceField', vizMode: 'info' },
-  { latex: 'sin(x) + cos(y)', type: 'trigonometric', template: 'TrigSurface', vizMode: '3d' },
-  { latex: 'F = -kx', type: 'physics', template: 'ForceField', vizMode: 'info' },
-  { latex: 'y = mx + b', type: 'polynomial', template: 'PolySurface', vizMode: 'info' },
-  { latex: 'e^{i\\pi} + 1 = 0', type: 'exponential', template: 'ExpSurface', vizMode: 'info' },
-];
+interface ExtractPayload {
+  source: string;
+  url?: string;
+  text?: string;
+}
 
 export function useExtract() {
   const [equations, setEquations] = useState<Equation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
+  const [backendDown, setBackendDown] = useState(false);
+  const [lastPayload, setLastPayload] = useState<ExtractPayload | null>(null);
 
   const extract = async (source: string, url?: string, text?: string) => {
     setLoading(true);
     setError(null);
+    setBackendDown(false);
+    setLastPayload({ source, url, text });
     resetBackendCheck();
     try {
       const res = await api.extract({ source, url, text });
@@ -27,12 +28,11 @@ export function useExtract() {
         ...eq,
         vizMode: classifyVizMode(eq.latex, eq.type),
       })));
-      setDemoMode(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Extraction failed';
       if (msg.includes('BACKEND_OFFLINE') || msg.includes('not available')) {
-        setDemoMode(true);
-        setEquations(DEMO_EQUATIONS);
+        setBackendDown(true);
+        setEquations([]);
         setError(null);
       } else {
         setError(msg);
@@ -42,5 +42,9 @@ export function useExtract() {
     }
   };
 
-  return { equations, loading, error, extract, setEquations, demoMode };
+  const retry = () => {
+    if (lastPayload) extract(lastPayload.source, lastPayload.url, lastPayload.text);
+  };
+
+  return { equations, loading, error, extract, retry, backendDown, setEquations };
 }
