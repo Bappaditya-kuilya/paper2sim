@@ -8,7 +8,7 @@ const SAMPLE = 'We claim Monte Carlo estimates of pi converge at O(1/sqrt(N)).';
 
 // Simulate view (PRD §5-6): submit → live stepper → claim/verdict/3D + recent runs.
 export function JobsView() {
-  const { jobs, active, loading, error, backendDown, submit, open, refreshList } = useJobs();
+  const { jobs, active, loading, error, backendDown, submit, open, refreshList, recheck } = useJobs();
 
   useEffect(() => {
     void refreshList();
@@ -26,7 +26,15 @@ export function JobsView() {
         loading={loading}
       />
       {backendDown && !loading && (
-        <p className="text-center text-sm text-red-200">Can&apos;t reach the server — the free tier sleeps when idle. Wait a minute and retry.</p>
+        <div className="text-center">
+          <p className="text-sm text-red-200">Can&apos;t reach the server — the free tier sleeps when idle. Wait a minute and retry.</p>
+          <button
+            onClick={() => void recheck()}
+            className="mt-3 rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
+          >
+            Retry
+          </button>
+        </div>
       )}
       {active && <JobDetail job={active} />}
       {jobs.length > 0 && (

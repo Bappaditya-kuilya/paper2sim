@@ -5,14 +5,19 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 let backendAvailable: boolean | null = null;
 
+// Render free tier sleeps when idle; wake takes 30-50s. Cover it: 5 tries,
+// 10s timeout each, 2/4/6/8s backoff (~70s worst case) before declaring offline.
+const HEALTH_TRIES = 5;
+const HEALTH_TIMEOUT = 10000;
+
 async function checkBackend(): Promise<boolean> {
   if (backendAvailable !== null) return backendAvailable;
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < HEALTH_TRIES; i++) {
     try {
-      const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(10000) });
+      const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(HEALTH_TIMEOUT) });
       if (res.ok) { backendAvailable = true; return true; }
-    } catch { /* retry once */ }
-    if (i === 0) await new Promise(r => setTimeout(r, 2000));
+    } catch { /* backoff below */ }
+    if (i < HEALTH_TRIES - 1) await new Promise(r => setTimeout(r, 2000 * (i + 1)));
   }
   backendAvailable = false;
   return false;
