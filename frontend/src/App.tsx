@@ -7,8 +7,10 @@ import { PaperInput } from './components/PaperInput'
 import { EquationList } from './components/EquationList'
 import { ProgressTracker } from './components/ProgressTracker'
 import { Sandbox3D, MathSurface } from './components/sandbox'
-import { SettingsPanel } from './components/ui/ExportMenu'
+import { EquationInfo } from './components/EquationInfo'
+import { SettingsPanel, ExportMenu } from './components/ui/ExportMenu'
 import { classifyExpression } from './lib/mathParser'
+import { getSampleEquations } from './lib/sampleData'
 import { showToast } from './components/Toast'
 import { useExtract } from './hooks/useExtract'
 import type { Equation } from './types'
@@ -23,7 +25,7 @@ export default function App() {
   const [renderingEquation, setRenderingEquation] = useState<Equation | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
 
-  const { equations, loading: extractLoading, error: extractError, extract, demoMode } = useExtract()
+  const { equations, loading: extractLoading, error: extractError, extract, extractUpload, retry, backendDown, setEquations } = useExtract()
 
   useEffect(() => {
     if (API_BASE) {
@@ -43,11 +45,23 @@ export default function App() {
     setCurrentStep(0)
     setRenderingEquation(null)
     setActiveView('extract')
+    if (payload.mode === 'pdf' && payload.value instanceof File) {
+      extractUpload(payload.value)
+      return
+    }
     const mode = payload.mode === 'arxiv' ? 'url' : 'text'
     const url = mode === 'url' ? (payload.value as string) : undefined
     const text = mode === 'text' ? String(payload.value) : undefined
     extract(mode, url, text)
-  }, [extract])
+  }, [extract, extractUpload])
+
+  const handleSample = useCallback(() => {
+    setCurrentStep(1)
+    setRenderingEquation(null)
+    setActiveView('extract')
+    setEquations(getSampleEquations())
+    showToast('Sample loaded — no backend needed')
+  }, [setEquations])
 
   const handleSelectEquation = useCallback((eq: Equation) => {
     setRenderingEquation(eq)
@@ -56,19 +70,34 @@ export default function App() {
     showToast(`Visualizing: ${eq.type}`)
   }, [])
 
+  const handleExport = useCallback((format: 'svg' | 'png' | 'json') => {
+    if (!renderingEquation) return
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(renderingEquation, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'equation.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    } else if (format === 'png') {
+      const canvas = document.querySelector('#equation-viewport canvas')
+      if (canvas instanceof HTMLCanvasElement) {
+        const a = document.createElement('a')
+        a.href = canvas.toDataURL('image/png')
+        a.download = 'visualization.png'
+        a.click()
+      } else {
+        showToast('3D view not available for PNG export', 'error')
+      }
+    }
+  }, [renderingEquation])
+
   const modelType = renderingEquation ? classifyExpression(renderingEquation.latex) : 'function'
 
   return (
     <div className="flex h-screen flex-col bg-zinc-900 text-zinc-100">
       <Toaster position="top-right" />
-      {demoMode && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 rounded-lg border border-yellow-700 bg-yellow-900/90 p-4 text-yellow-200 backdrop-blur">
-          <p className="text-sm">
-            <strong>Demo Mode:</strong> Backend server is not connected. Showing sample equations.
-            To use full functionality, start the backend server with <code className="rounded bg-yellow-800 px-1">python api.py</code>
-          </p>
-        </div>
-      )}
       <Header mobileOpen={mobileOpen} onToggleMobile={() => setMobileOpen((o) => !o)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -86,34 +115,61 @@ export default function App() {
               />
             </div>
           ) : activeView === 'render' && renderingEquation ? (
-            <div className="flex h-full flex-col space-y-4">
+            <div className="mx-auto max-w-4xl space-y-6">
               <div className="flex items-center justify-between">
-                <p className="font-mono text-xs text-zinc-500">{renderingEquation.latex}</p>
-                <button
-                  onClick={() => setActiveView('extract')}
-                  className="text-xs text-zinc-500 hover:text-zinc-300"
-                >
-                  Back to equations
-                </button>
-              </div>
-              <div className="flex-1 min-h-0">
-                <Sandbox3D>
-                  <MathSurface
-                    expression={renderingEquation.latex}
-                    modelType={modelType}
+                <h2 className="text-sm font-medium text-zinc-400">Equation Details</h2>
+                <div className="flex items-center gap-2">
+                  <ExportMenu
+                    formats={['png', 'json']}
+                    onExport={handleExport}
                   />
-                </Sandbox3D>
+                  <button
+                    onClick={() => setActiveView('extract')}
+                    className="text-xs text-zinc-500 hover:text-zinc-300"
+                  >
+                    Back to equations
+                  </button>
+                </div>
               </div>
+              <EquationInfo equation={renderingEquation} />
+              {renderingEquation.vizMode === '3d' && (
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-400 mb-3">Interactive 3D</h3>
+                  <div id="equation-viewport" className="h-96">
+                    <Sandbox3D>
+                      <MathSurface
+                        expression={renderingEquation.latex}
+                        modelType={modelType}
+                      />
+                    </Sandbox3D>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mx-auto max-w-4xl space-y-6">
               <ProgressTracker currentStep={currentStep} steps={STEPS} />
-              <PaperInput onAnalyze={handleAnalyze} loading={extractLoading} />
-              <EquationList
-                equations={equations}
-                loading={extractLoading}
-                onSelect={handleSelectEquation}
-              />
+              <PaperInput onAnalyze={handleAnalyze} onSample={handleSample} loading={extractLoading} />
+              {backendDown && !extractLoading ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-red-900/60 bg-red-950/30 py-12 text-center">
+                  <p className="text-sm font-medium text-red-200">Can&apos;t reach the analysis server</p>
+                  <p className="mt-1 max-w-md text-xs text-zinc-400">
+                    Nothing from your paper yet. The free-tier backend sleeps when idle — first load can take about a minute.
+                  </p>
+                  <button
+                    onClick={retry}
+                    className="mt-4 rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <EquationList
+                  equations={equations}
+                  loading={extractLoading}
+                  onSelect={handleSelectEquation}
+                />
+              )}
             </div>
           )}
         </MainContent>

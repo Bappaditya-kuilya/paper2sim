@@ -1,5 +1,5 @@
 
-import * as THREE from 'three';
+import { DoubleSide } from 'three';
 
 export interface ProbDiagramProps {
   pA?: number;
@@ -23,17 +23,17 @@ export function ProbDiagram({
     <group>
       <mesh position={[-offset, 0, 0]}>
         <circleGeometry args={[circleRadius, 32]} />
-        <meshStandardMaterial color="#3b82f6" transparent opacity={0.4} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#3b82f6" transparent opacity={0.4} side={DoubleSide} />
       </mesh>
 
       <mesh position={[offset, 0, 0]}>
         <circleGeometry args={[circleRadius, 32]} />
-        <meshStandardMaterial color="#ef4444" transparent opacity={0.4} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#ef4444" transparent opacity={0.4} side={DoubleSide} />
       </mesh>
 
       <mesh position={[0, 0, 0.01]}>
         <circleGeometry args={[circleRadius * 0.5, 32]} />
-        <meshStandardMaterial color="#a855f7" transparent opacity={0.6} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#a855f7" transparent opacity={0.6} side={DoubleSide} />
       </mesh>
 
       {showConditional && (

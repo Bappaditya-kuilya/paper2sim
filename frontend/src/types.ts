@@ -3,19 +3,12 @@ export interface Equation {
   type: string;
   template?: string;
   label?: string;
+  vizMode?: '3d' | 'info';
 }
 
 export interface ExtractResponse {
   equations: Equation[];
   paper_info?: Record<string, unknown>;
-}
-
-export interface RenderJob {
-  job_id: string;
-  status: 'queued' | 'rendering' | 'complete' | 'failed';
-  progress: number;
-  error?: string;
-  video_path?: string;
 }
 
 export interface BreakdownResponse {

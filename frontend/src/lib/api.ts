@@ -1,4 +1,4 @@
-import type { ExtractResponse, RenderJob, BreakdownResponse } from '../types';
+import type { ExtractResponse, BreakdownResponse } from '../types';
 import { AppError } from './errors';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -50,14 +50,20 @@ export const api = {
   extract: (body: { source: string; url?: string; text?: string }) =>
     apiFetch<ExtractResponse>('/api/extract', { method: 'POST', body: JSON.stringify(body) }),
 
-  render: (body: { template: string; equation: string; params?: Record<string, number> }) =>
-    apiFetch<{ job_id: string; status: string }>('/api/render', { method: 'POST', body: JSON.stringify(body) }),
-
-  renderStatus: (jobId: string) =>
-    apiFetch<RenderJob>(`/api/render/${jobId}/status`),
-
-  renderVideo: (jobId: string) =>
-    apiFetch<{ video_path: string }>(`/api/render/${jobId}/video`),
+  extractUpload: async (file: File): Promise<ExtractResponse> => {
+    const available = await checkBackend();
+    if (!available) {
+      throw new AppError('Backend server is not available. Please ensure the API server is running.', 'BACKEND_OFFLINE');
+    }
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_BASE}/api/extract/upload`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new AppError(`API error ${res.status}: ${body}`, String(res.status));
+    }
+    return res.json();
+  },
 
   breakdown: (body: { text?: string; model?: string }) =>
     apiFetch<BreakdownResponse>('/api/breakdown', { method: 'POST', body: JSON.stringify(body) }),

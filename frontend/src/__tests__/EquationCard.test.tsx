@@ -15,3 +15,13 @@ test('shows template badge when provided', () => {
   render(<EquationCard latex="x" type="eq" template="pendulum" onSelect={() => {}} />)
   expect(screen.getByText('pendulum')).toBeDefined()
 })
+
+test('hints interactive 3D when vizMode is 3d', () => {
+  render(<EquationCard latex="x" type="eq" vizMode="3d" onSelect={() => {}} />)
+  expect(screen.getByText('Opens interactive 3D')).toBeDefined()
+})
+
+test('hints equation details otherwise', () => {
+  render(<EquationCard latex="x" type="eq" onSelect={() => {}} />)
+  expect(screen.getByText('Opens equation details')).toBeDefined()
+})

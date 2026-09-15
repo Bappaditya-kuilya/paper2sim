@@ -1,7 +1,7 @@
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
-import * as THREE from 'three';
+import { DoubleSide, type BufferGeometry } from 'three';
 
 export interface Sandbox3DProps {
   children?: React.ReactNode;
@@ -46,7 +46,7 @@ export function Sandbox3D({
     <div className="h-full w-full rounded-lg border border-zinc-800 bg-zinc-950">
       <Canvas
         camera={{ position: cameraPosition, fov: 50 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
       >
         <Scene gridVisible={gridVisible} axesVisible={axesVisible}>
           {children}
@@ -57,7 +57,7 @@ export function Sandbox3D({
 }
 
 export interface SurfaceMeshProps {
-  geometry: THREE.BufferGeometry;
+  geometry: BufferGeometry;
   wireframe?: boolean;
   opacity?: number;
 }
@@ -68,7 +68,7 @@ export function SurfaceMesh({ geometry, wireframe = false, opacity = 1 }: Surfac
       <meshStandardMaterial
         vertexColors
         wireframe={wireframe}
-        side={THREE.DoubleSide}
+        side={DoubleSide}
         transparent={opacity < 1}
         opacity={opacity}
       />

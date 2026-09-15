@@ -52,43 +52,6 @@ def test_extract_text_classifies_equation():
     assert data["equations"][0]["type"] in ("polynomial", "unknown")
 
 
-def test_render_returns_job_id():
-    response = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    assert response.status_code == 200
-    data = response.json()
-    assert "job_id" in data
-    assert data["status"] == "queued"
-
-
-def test_render_requires_template():
-    response = client.post("/api/render", json={"equation": "sin(x)"})
-    assert response.status_code == 422
-
-
-def test_render_status_returns_job():
-    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    job_id = create.json()["job_id"]
-    response = client.get(f"/api/render/{job_id}/status")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["job_id"] == job_id
-    assert data["status"] == "queued"
-
-
-def test_render_status_not_found():
-    response = client.get("/api/render/nonexistent/status")
-    assert response.status_code == 200
-    assert "error" in response.json()
-
-
-def test_render_video_not_ready():
-    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    job_id = create.json()["job_id"]
-    response = client.get(f"/api/render/{job_id}/video")
-    assert response.status_code == 200
-    assert "error" in response.json()
-
-
 def test_breakdown_returns_error():
     response = client.post("/api/breakdown", json={"text": "test"})
     assert response.status_code == 200
@@ -114,13 +77,6 @@ def test_validation_error_returns_422():
     assert response.status_code == 422
 
 
-def test_render_stream_returns_event_stream():
-    create = client.post("/api/render", json={"template": "sin", "equation": "sin(x)"})
-    job_id = create.json()["job_id"]
-    response = client.get(f"/api/render/{job_id}/stream")
-    assert response.status_code == 200
-
-
 def test_breakdown_calls_client():
     response = client.post("/api/breakdown", json={"text": "F = ma"})
     assert response.status_code == 200
@@ -137,3 +93,44 @@ def test_extract_upload_rejects_non_pdf():
     response = client.post("/api/extract/upload", files={"file": ("test.txt", b"content", "text/plain")})
     assert response.status_code == 200
     assert "error" in response.json()
+
+
+def _make_sample_pdf(path, lines):
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page()
+    y = 72
+    for line in lines:
+        page.insert_text((72, y), line)
+        y += 50
+    doc.save(path)
+    doc.close()
+
+
+def test_extract_upload_finds_block_equations(tmp_path):
+    pdf_path = tmp_path / "sample.pdf"
+    eq1 = "E = mc^2"
+    eq2 = r"\frac{a}{b} + \sum_{i} x_{i}"
+    _make_sample_pdf(pdf_path, ["This is introduction to machine learning.", eq1, eq2])
+    with open(pdf_path, "rb") as f:
+        response = client.post("/api/extract/upload", files={"file": ("sample.pdf", f, "application/pdf")})
+    assert response.status_code == 200
+    data = response.json()
+    assert "equations" in data
+    assert len(data["equations"]) == 2
+    assert data["equations"][0]["latex"] == eq1
+    assert data["equations"][1]["latex"] == eq2
+    assert data["paper_info"] == {"filename": "sample.pdf"}
+
+
+def test_extract_upload_finds_math_without_equals_caret(tmp_path):
+    pdf_path = tmp_path / "math.pdf"
+    eq = r"\frac{a}{b} + \sum_{i} x_{i}"
+    _make_sample_pdf(pdf_path, ["Plain prose about nothing.", eq])
+    with open(pdf_path, "rb") as f:
+        response = client.post("/api/extract/upload", files={"file": ("math.pdf", f, "application/pdf")})
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["equations"]) == 1
+    assert data["equations"][0]["latex"] == eq
