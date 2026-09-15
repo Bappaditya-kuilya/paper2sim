@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
+import { CatmullRomCurve3, TubeGeometry, Vector3, type Group } from 'three';
 
 export interface SpringForceProps {
   springConstant?: number;
@@ -17,7 +17,7 @@ export function SpringForce({
   mass = 1,
   initialDisplacement = 1,
 }: SpringForceProps) {
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<Group>(null);
   const timeRef = useRef(0);
 
   useFrame((_, delta) => {
@@ -30,7 +30,7 @@ export function SpringForce({
   });
 
   const springPoints = useMemo(() => {
-    const points: THREE.Vector3[] = [];
+    const points: Vector3[] = [];
     const coils = 10;
     const amplitude = 0.3;
     for (let i = 0; i <= coils * 20; i++) {
@@ -38,14 +38,14 @@ export function SpringForce({
       const x = t * restLength;
       const y = amplitude * Math.sin(t * coils * Math.PI * 2);
       const z = amplitude * Math.cos(t * coils * Math.PI * 2);
-      points.push(new THREE.Vector3(x, y, z));
+      points.push(new Vector3(x, y, z));
     }
     return points;
   }, [restLength]);
 
   const springGeometry = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3(springPoints);
-    return new THREE.TubeGeometry(curve, 100, 0.05, 8, false);
+    const curve = new CatmullRomCurve3(springPoints);
+    return new TubeGeometry(curve, 100, 0.05, 8, false);
   }, [springPoints]);
 
   return (
@@ -189,7 +189,7 @@ export function IdealGas({
   }
   const particles = particlesRef.current;
 
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<Group>(null);
 
   useFrame(() => {
     if (!groupRef.current) return;

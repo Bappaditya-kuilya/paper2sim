@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
-import * as THREE from 'three';
+import { BufferAttribute, BufferGeometry, Color, DoubleSide } from 'three';
 import { generateSurface, createSurfaceGeometry } from '../../lib/surfaceBuilder';
 import { math } from '../../lib/mathParser';
 
@@ -36,7 +36,7 @@ export function GenericSurface({
       const grid = generateSurface(fn, { xRange, yRange, resolution });
       return createSurfaceGeometry(grid);
     } catch {
-      return new THREE.BufferGeometry();
+      return new BufferGeometry();
     }
   }, [expression, variables, xRange, yRange, resolution]);
 
@@ -66,7 +66,7 @@ export function GenericSurface({
         <meshStandardMaterial
           vertexColors
           wireframe={wireframe}
-          side={THREE.DoubleSide}
+          side={DoubleSide}
         />
       </mesh>
       {hoverPos && (
@@ -132,7 +132,7 @@ export function ParametricSurface({
         normals[i * 3 + 2] = 0;
         const t = positions[i * 3 + 1] / 5;
         const h = (1.0 - Math.max(0, Math.min(1, t))) * 0.6;
-        const c = new THREE.Color().setHSL(h, 0.8, 0.5);
+        const c = new Color().setHSL(h, 0.8, 0.5);
         colors[i * 3] = c.r;
         colors[i * 3 + 1] = c.g;
         colors[i * 3 + 2] = c.b;
@@ -156,20 +156,20 @@ export function ParametricSurface({
         }
       }
 
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geo.setIndex(new THREE.BufferAttribute(indices, 1));
+      const geo = new BufferGeometry();
+      geo.setAttribute('position', new BufferAttribute(positions, 3));
+      geo.setAttribute('normal', new BufferAttribute(normals, 3));
+      geo.setAttribute('color', new BufferAttribute(colors, 3));
+      geo.setIndex(new BufferAttribute(indices, 1));
       return geo;
     } catch {
-      return new THREE.BufferGeometry();
+      return new BufferGeometry();
     }
   }, [expressionX, expressionY, expressionZ, uRange, vRange, resolution]);
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial vertexColors wireframe={wireframe} side={THREE.DoubleSide} />
+      <meshStandardMaterial vertexColors wireframe={wireframe} side={DoubleSide} />
     </mesh>
   );
 }
