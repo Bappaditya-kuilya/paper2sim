@@ -63,7 +63,7 @@ def run_script(source: str, timeout_s: int = 60, max_mem_mb: int = 2048, max_out
     import subprocess
 
     with contextlib.ExitStack() as stack:
-        rundir = out_dir or stack.enter_context(tempfile.TemporaryDirectory(prefix="p2s_"))
+        rundir = os.path.abspath(out_dir) if out_dir else stack.enter_context(tempfile.TemporaryDirectory(prefix="p2s_"))
         Path(rundir).mkdir(parents=True, exist_ok=True)
         main = Path(rundir) / "main.py"
         main.write_text(source)
