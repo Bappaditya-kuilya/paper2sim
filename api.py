@@ -72,6 +72,14 @@ def cache_set(key: str, val):
     _cache[key] = (time.time(), val)
 
 
+def _block_math_score(text: str) -> int:
+    score = sum(text.count(c) for c in ("=", "^", "_", "{", "}", "\\"))
+    lowered = text.lower()
+    for kw in ("\\int", "\\sum", "\\frac", "\\sqrt"):
+        score += lowered.count(kw)
+    return score
+
+
 app = FastAPI(
     title="Paper2Sim API",
     description="Extract equations from papers and visualize them interactively",
@@ -181,11 +189,17 @@ async def extract_upload(file: UploadFile = File(...)):
     try:
         import fitz
         doc = fitz.open(tmp_path)
-        text = ""
+        candidates: list[str] = []
         for page in doc:
-            text += page.get_text()
+            blocks = sorted(page.get_text("blocks"), key=lambda b: (b[1], b[0]))
+            for b in blocks:
+                if b[6] != 0:
+                    continue
+                cleaned = " ".join(line.strip() for line in b[4].splitlines() if line.strip())
+                if cleaned and _block_math_score(cleaned) > 0:
+                    candidates.append(cleaned)
         doc.close()
-        equations = [{"latex": line.strip(), "type": "display"} for line in text.split("\n") if line.strip() and ("=" in line or "^" in line)]
+        equations = [{"latex": t, "type": "display"} for t in candidates]
         for eq in equations:
             eq["type"] = classify_equation(eq["latex"])
         result = select_templates(equations)
