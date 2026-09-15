@@ -5,7 +5,18 @@ const SURFACE_TYPES = new Set([
   'polynomial',
   'exponential',
   'logarithmic',
+]);
+
+// Newly-wired RendererSelector cases all render inside the Sandbox3D
+// canvas (MatrixVis, ProbDiagram, DistChart, SlopeField, ForceField,
+// GenericSurface for hyperbolic), so they are unconditionally '3d'.
+const CANVAS_TYPES = new Set([
   'hyperbolic',
+  'matrix',
+  'probability',
+  'statistical',
+  'ode',
+  'physics',
 ]);
 
 function countVariables(latex: string): number {
@@ -17,6 +28,7 @@ function countVariables(latex: string): number {
 }
 
 export function classifyVizMode(latex: string, type: string): '3d' | 'info' {
+  if (CANVAS_TYPES.has(type)) return '3d';
   if (SURFACE_TYPES.has(type) && countVariables(latex) >= 2) return '3d';
   if (type === 'function' && countVariables(latex) >= 2) return '3d';
   return 'info';
