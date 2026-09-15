@@ -2,10 +2,11 @@ interface EquationCardProps {
   latex: string
   type: string
   template?: string
+  vizMode?: '3d' | 'info'
   onSelect: () => void
 }
 
-export function EquationCard({ latex, type, template, onSelect }: EquationCardProps) {
+export function EquationCard({ latex, type, template, vizMode, onSelect }: EquationCardProps) {
   return (
     <button
       onClick={onSelect}
@@ -16,6 +17,11 @@ export function EquationCard({ latex, type, template, onSelect }: EquationCardPr
         <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">
           {type}
         </span>
+        {vizMode === '3d' && (
+          <span className="inline-flex items-center rounded-full bg-emerald-900/40 px-2 py-0.5 text-xs font-medium text-emerald-300">
+            3D
+          </span>
+        )}
         {template && (
           <span className="inline-flex items-center rounded-full bg-blue-900/40 px-2 py-0.5 text-xs font-medium text-blue-300">
             {template}
