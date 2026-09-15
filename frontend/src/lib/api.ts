@@ -1,4 +1,4 @@
-import type { ExtractResponse, RenderJob, BreakdownResponse } from '../types';
+import type { ExtractResponse, BreakdownResponse } from '../types';
 import { AppError } from './errors';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -49,15 +49,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit, retries =
 export const api = {
   extract: (body: { source: string; url?: string; text?: string }) =>
     apiFetch<ExtractResponse>('/api/extract', { method: 'POST', body: JSON.stringify(body) }),
-
-  render: (body: { template: string; equation: string; params?: Record<string, number> }) =>
-    apiFetch<{ job_id: string; status: string }>('/api/render', { method: 'POST', body: JSON.stringify(body) }),
-
-  renderStatus: (jobId: string) =>
-    apiFetch<RenderJob>(`/api/render/${jobId}/status`),
-
-  renderVideo: (jobId: string) =>
-    apiFetch<{ video_path: string }>(`/api/render/${jobId}/video`),
 
   breakdown: (body: { text?: string; model?: string }) =>
     apiFetch<BreakdownResponse>('/api/breakdown', { method: 'POST', body: JSON.stringify(body) }),

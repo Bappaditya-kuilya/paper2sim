@@ -23,23 +23,3 @@ class ValidatedExtractRequest(BaseModel):
         if self.source == "text" and not self.text:
             raise ValueError("text required when source is text")
         return self
-
-
-class ValidatedRenderRequest(BaseModel):
-    template: str
-    params: dict = {}
-    equation: str
-
-    @field_validator("template")
-    @classmethod
-    def template_not_empty(cls, v):
-        if not v or not v.strip():
-            raise ValueError("template cannot be empty")
-        return v.strip()
-
-    @field_validator("equation")
-    @classmethod
-    def equation_not_empty(cls, v):
-        if not v or not v.strip():
-            raise ValueError("equation cannot be empty")
-        return v.strip()

@@ -11,14 +11,6 @@ export interface ExtractResponse {
   paper_info?: Record<string, unknown>;
 }
 
-export interface RenderJob {
-  job_id: string;
-  status: 'queued' | 'rendering' | 'complete' | 'failed';
-  progress: number;
-  error?: string;
-  video_path?: string;
-}
-
 export interface BreakdownResponse {
   breakdowns: Array<{
     latex: string;

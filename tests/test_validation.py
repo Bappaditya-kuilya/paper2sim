@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from paper2sim.validation import ValidatedExtractRequest, ValidatedRenderRequest
+from paper2sim.validation import ValidatedExtractRequest
 
 
 def test_valid_extract_arxiv():
@@ -29,23 +29,3 @@ def test_arxiv_requires_url():
 def test_text_requires_text():
     with pytest.raises(ValidationError):
         ValidatedExtractRequest(source="text")
-
-
-def test_valid_render():
-    req = ValidatedRenderRequest(template="sin", equation="sin(x)")
-    assert req.template == "sin"
-
-
-def test_render_strips_whitespace():
-    req = ValidatedRenderRequest(template="  sin  ", equation="sin(x)")
-    assert req.template == "sin"
-
-
-def test_render_empty_template():
-    with pytest.raises(ValidationError):
-        ValidatedRenderRequest(template="", equation="sin(x)")
-
-
-def test_render_empty_equation():
-    with pytest.raises(ValidationError):
-        ValidatedRenderRequest(template="sin", equation="")
