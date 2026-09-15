@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { api, resetBackendCheck } from '../lib/api';
+import { classifyVizMode } from '../lib/vizClassifier';
 import type { Equation } from '../types';
 
 const DEMO_EQUATIONS: Equation[] = [
-  { latex: 'E = mc^2', type: 'physics', template: 'ForceField' },
-  { latex: 'sin(x) + cos(y)', type: 'trigonometric', template: 'TrigSurface' },
-  { latex: 'F = -kx', type: 'physics', template: 'ForceField' },
-  { latex: 'y = mx + b', type: 'polynomial', template: 'PolySurface' },
-  { latex: 'e^{i\\pi} + 1 = 0', type: 'exponential', template: 'ExpSurface' },
+  { latex: 'E = mc^2', type: 'physics', template: 'ForceField', vizMode: 'info' },
+  { latex: 'sin(x) + cos(y)', type: 'trigonometric', template: 'TrigSurface', vizMode: '3d' },
+  { latex: 'F = -kx', type: 'physics', template: 'ForceField', vizMode: 'info' },
+  { latex: 'y = mx + b', type: 'polynomial', template: 'PolySurface', vizMode: 'info' },
+  { latex: 'e^{i\\pi} + 1 = 0', type: 'exponential', template: 'ExpSurface', vizMode: 'info' },
 ];
 
 export function useExtract() {
@@ -22,7 +23,10 @@ export function useExtract() {
     resetBackendCheck();
     try {
       const res = await api.extract({ source, url, text });
-      setEquations(res.equations);
+      setEquations(res.equations.map(eq => ({
+        ...eq,
+        vizMode: classifyVizMode(eq.latex, eq.type),
+      })));
       setDemoMode(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Extraction failed';
