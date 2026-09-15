@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar'
 import { MainContent } from './components/MainContent'
 import { PaperInput } from './components/PaperInput'
 import { EquationList } from './components/EquationList'
+import { JobsView } from './components/JobsView'
 import { ProgressTracker } from './components/ProgressTracker'
 import { Sandbox3D, MathSurface } from './components/sandbox'
 import { EquationInfo } from './components/EquationInfo'
@@ -21,7 +22,7 @@ const STEPS = ['Extract', 'Classify', 'Visualize', 'Render']
 
 export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [activeView, setActiveView] = useState<'extract' | 'render' | 'settings'>('extract')
+  const [activeView, setActiveView] = useState<'extract' | 'render' | 'settings' | 'jobs'>('extract')
   const [renderingEquation, setRenderingEquation] = useState<Equation | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
 
@@ -103,11 +104,13 @@ export default function App() {
         <Sidebar
           mobileOpen={mobileOpen}
           activeItem={activeView}
-          onNavigate={(id) => setActiveView(id as 'extract' | 'render' | 'settings')}
+          onNavigate={(id) => setActiveView(id as 'extract' | 'render' | 'settings' | 'jobs')}
           onClose={() => setMobileOpen(false)}
         />
         <MainContent>
-          {activeView === 'settings' ? (
+          {activeView === 'jobs' ? (
+            <JobsView />
+          ) : activeView === 'settings' ? (
             <div className="mx-auto max-w-lg space-y-6">
               <SettingsPanel
                 onSettingsChange={(s) => showToast(`Settings: ${JSON.stringify(s)}`)}

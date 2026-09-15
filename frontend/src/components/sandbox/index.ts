@@ -9,5 +9,6 @@ export { ForceField, EnergySurface, OhmSurface, PowerSurface } from './ForceFiel
 export { SpringForce, GravitationalForce, CoulombForce, IdealGas } from './PhysicsRenderers';
 export { DistChart } from './DistChart';
 export { SlopeField } from './SlopeField';
+export { TrajectoryRenderer } from './TrajectoryRenderer';
 export { MatrixVis } from './MatrixVis';
 export { ProbDiagram, CalculatorDisplay } from './ProbDiagram';

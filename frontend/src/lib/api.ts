@@ -1,4 +1,4 @@
-import type { ExtractResponse, BreakdownResponse } from '../types';
+import type { ExtractResponse, BreakdownResponse, Job, JobListItem } from '../types';
 import { AppError } from './errors';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -67,4 +67,23 @@ export const api = {
 
   breakdown: (body: { text?: string; model?: string }) =>
     apiFetch<BreakdownResponse>('/api/breakdown', { method: 'POST', body: JSON.stringify(body) }),
+
+  submitPaper: async (form: FormData): Promise<{ job_id: string }> => {
+    const available = await checkBackend();
+    if (!available) {
+      throw new AppError('Backend server is not available. Please ensure the API server is running.', 'BACKEND_OFFLINE');
+    }
+    const res = await fetch(`${API_BASE}/api/papers`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new AppError(`API error ${res.status}: ${body}`, String(res.status));
+    }
+    return res.json();
+  },
+
+  listJobs: () => apiFetch<{ jobs: JobListItem[] }>('/api/jobs'),
+
+  getJob: (id: string) => apiFetch<Job>(`/api/jobs/${id}`),
+
+  artifactUrl: (id: string, fname: string) => `${API_BASE}/api/jobs/${id}/artifacts/${fname}`,
 };

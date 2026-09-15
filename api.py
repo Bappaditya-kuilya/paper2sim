@@ -2,25 +2,37 @@
 
 import asyncio
 import logging
+import os
+import re
 import tempfile
 import time
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ValidationError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from paper2sim import jobs as job_store
 from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse_arxiv_url
 from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
 from paper2sim.breakdown_client import breakdown_equations
+from paper2sim.pipeline import run_pipeline
 from paper2sim.storyboard_client import generate_storyboard
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+if os.environ.get("SENTRY_DSN"):  # text.md §2.3: 5K errors/mo free; inert without DSN
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(dsn=os.environ["SENTRY_DSN"])
+    except ImportError:
+        logger.warning("SENTRY_DSN set but sentry-sdk not installed")
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -90,7 +102,7 @@ app.state.limiter = limiter
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -215,6 +227,86 @@ async def extract_upload(file: UploadFile = File(...)):
         return {"error": f"PDF extraction failed: {e}"}
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
+MAX_UPLOAD_MB = 20
+MAX_SUBMIT_TEXT = 100000
+_ARTIFACT_RE = re.compile(r"^figure_\d+\.(png|gif)$")
+
+
+def _data_dir() -> Path:
+    return Path(os.environ.get("DATA_DIR", "./data"))
+
+
+@app.post("/api/papers")
+@limiter.limit("20/hour")
+async def submit_paper(
+    request: Request,
+    background: BackgroundTasks,
+    file: UploadFile | None = File(default=None),
+    arxiv: str | None = Form(default=None),
+    text: str | None = Form(default=None),
+    title: str | None = Form(default=None),
+):
+    """Submit a paper for the 5-stage pipeline. Exactly one of file/arxiv/text. Bad input → 400."""
+    has_file = file is not None and bool(file.filename)
+    has_arxiv = bool(arxiv and arxiv.strip())
+    has_text = bool(text and text.strip())
+    if sum((has_file, has_arxiv, has_text)) != 1:
+        raise HTTPException(status_code=400, detail="Provide exactly one of: file (PDF), arxiv id/URL, or text")
+    if has_arxiv:
+        arxiv_id = parse_arxiv_url(arxiv.strip())
+        if not arxiv_id:
+            raise HTTPException(status_code=400, detail="Invalid arXiv id or URL")
+        job = job_store.create(source_kind="arxiv", source_ref=arxiv_id, title=(title or arxiv_id).strip()[:200])
+    elif has_text:
+        if len(text) > MAX_SUBMIT_TEXT:
+            raise HTTPException(status_code=400, detail=f"Pasted text exceeds {MAX_SUBMIT_TEXT} chars")
+        job = job_store.create(source_kind="text", source_ref=text.strip(), title=(title or text.strip()[:80]).strip()[:200])
+    else:
+        if not file.filename.endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Only PDF files supported")
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"PDF exceeds {MAX_UPLOAD_MB}MB")
+        job = job_store.create(source_kind="pdf", source_ref=file.filename, title=(title or file.filename).strip()[:200])
+        upath = _data_dir() / "uploads" / f"{job['id']}.pdf"
+        upath.parent.mkdir(parents=True, exist_ok=True)
+        upath.write_bytes(content)
+        job_store.update(job["id"], upload_path=str(upath))
+        job = job_store.get(job["id"])
+    background.add_task(run_pipeline, job["id"])
+    return {"job_id": job["id"]}
+
+
+@app.get("/api/jobs")
+async def list_jobs():
+    return {"jobs": job_store.list_recent()}
+
+
+@app.get("/api/jobs/{job_id}")
+async def get_job(job_id: str):
+    job = job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job id")
+    return job
+
+
+@app.get("/api/jobs/{job_id}/artifacts/{fname}")
+async def get_artifact(job_id: str, fname: str):
+    if not _ARTIFACT_RE.match(fname):
+        raise HTTPException(status_code=404, detail="Unknown artifact")
+    job = job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job id")
+    if fname not in [str(a).split("/")[-1] for a in job.get("artifacts", [])]:
+        raise HTTPException(status_code=404, detail="Unknown artifact")
+    run = next((str(a).split("/")[0] for a in job["artifacts"] if str(a).endswith(fname)), "")
+    base = (_data_dir() / "artifacts" / job_id).resolve()
+    path = (base / run / fname).resolve()
+    if not str(path).startswith(str(base)) or not path.is_file():
+        raise HTTPException(status_code=404, detail="Unknown artifact")
+    return FileResponse(path)
 
 
 @app.exception_handler(ValidationError)
