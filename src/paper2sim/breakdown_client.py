@@ -12,7 +12,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
-def breakdown_equations(equations: list[dict], model: str = "llama-3.3-70b-versatile") -> dict:
+def breakdown_equations(equations: list[dict], model: str = "openai/gpt-oss-20b") -> dict:
     """Break down equations into concept explanations.
 
     Args:

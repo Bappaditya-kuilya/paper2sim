@@ -27,6 +27,28 @@ def test_db_uses_wal_mode(isolated_data):
     assert mode == "wal"
 
 
+def test_sanitize_kills_nan_and_control_chars(isolated_data):
+    import json as J2
+
+    from paper2sim import jobs as J
+
+    job = J.create(source_kind="text", source_ref="x", title="t")
+    J.update(job["id"], execution={"stdout": "a\x00b\x1bc", "result_json": {"metrics": {"v": float("nan"), "w": float("inf")}, "verdict": "supported"}})
+    raw = J.get(job["id"])["execution"]
+    assert raw["stdout"] == "abc"
+    assert raw["result_json"]["metrics"] == {"v": None, "w": None}
+    J2.dumps(J.get(job["id"]), allow_nan=False)  # strict-JSON safe
+
+
+def test_scene_rejects_nonfinite_coefficients():
+    import pytest as _pt
+
+    from paper2sim.scene import validate_scene
+
+    with _pt.raises(Exception):
+        validate_scene({"type": "generic", "coefficients": [float("nan")]})
+
+
 def test_parse_analysis_valid_and_fallback():
     from paper2sim.pipeline import parse_analysis
 
