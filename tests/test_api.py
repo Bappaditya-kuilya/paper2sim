@@ -134,3 +134,8 @@ def test_extract_upload_finds_math_without_equals_caret(tmp_path):
     data = response.json()
     assert len(data["equations"]) == 1
     assert data["equations"][0]["latex"] == eq
+
+
+def test_head_health_ok_for_uptime_checkers():
+    response = client.request("HEAD", "/health")
+    assert response.status_code == 200

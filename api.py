@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, ValidationError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -111,6 +111,12 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.head("/health")
+async def health_head():
+    """Uptime checkers (UptimeRobot free) send HEAD by default — answer it."""
+    return Response(status_code=200)
 
 
 @app.get("/health/dependencies")
