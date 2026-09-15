@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import * as THREE from 'three';
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, Vector3 } from 'three';
 
 export interface ForceFieldProps {
   expression?: string;
@@ -9,7 +9,7 @@ export interface ForceFieldProps {
   arrowScale?: number;
 }
 
-function Arrow({ origin, direction, color, scale }: { origin: THREE.Vector3; direction: THREE.Vector3; color: string; scale: number }) {
+function Arrow({ origin, direction, color, scale }: { origin: Vector3; direction: Vector3; color: string; scale: number }) {
   const dir = direction.clone().normalize();
   const length = direction.length() * scale;
 
@@ -26,7 +26,7 @@ export function ForceField({
   arrowScale = 0.3,
 }: ForceFieldProps) {
   const arrows = useMemo(() => {
-    const result: Array<{ origin: THREE.Vector3; direction: THREE.Vector3; color: string }> = [];
+    const result: Array<{ origin: Vector3; direction: Vector3; color: string }> = [];
     const step = (gridSize * 2) / 10;
 
     for (let x = -gridSize; x <= gridSize; x += step) {
@@ -35,7 +35,7 @@ export function ForceField({
         const dx = -x * 0.1;
         const dz = -z * 0.1;
         const dy = force * 0.01;
-        const direction = new THREE.Vector3(dx, dy, dz);
+        const direction = new Vector3(dx, dy, dz);
         const magnitude = direction.length();
 
         let color = '#22c55e';
@@ -43,7 +43,7 @@ export function ForceField({
         else if (magnitude > 1) color = '#eab308';
 
         result.push({
-          origin: new THREE.Vector3(x, 0, z),
+          origin: new Vector3(x, 0, z),
           direction,
           color,
         });
@@ -106,7 +106,7 @@ export function EnergySurface({
       normals[i * 3 + 2] = 0;
       const t = Math.min(1, Math.max(0, (positions[i * 3 + 1] + 10) / 20));
       const h = (1 - t) * 0.7;
-      const c = new THREE.Color().setHSL(h, 0.8, 0.5);
+      const c = new Color().setHSL(h, 0.8, 0.5);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -130,17 +130,17 @@ export function EnergySurface({
       }
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new BufferAttribute(normals, 3));
+    geo.setAttribute('color', new BufferAttribute(colors, 3));
+    geo.setIndex(new BufferAttribute(indices, 1));
     return geo;
   }, [mass, gravity, springConstant, xRange, yRange, resolution]);
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial vertexColors side={THREE.DoubleSide} />
+      <meshStandardMaterial vertexColors side={DoubleSide} />
     </mesh>
   );
 }
@@ -185,7 +185,7 @@ export function OhmSurface({
       normals[i * 3 + 2] = 0;
       const t = Math.min(1, positions[i * 3 + 1] / maxVoltage);
       const h = (1 - t) * 0.15;
-      const c = new THREE.Color().setHSL(h, 0.9, 0.5);
+      const c = new Color().setHSL(h, 0.9, 0.5);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -209,17 +209,17 @@ export function OhmSurface({
       }
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new BufferAttribute(normals, 3));
+    geo.setAttribute('color', new BufferAttribute(colors, 3));
+    geo.setIndex(new BufferAttribute(indices, 1));
     return geo;
   }, [resistance, maxCurrent, maxVoltage, resolution]);
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial vertexColors side={THREE.DoubleSide} />
+      <meshStandardMaterial vertexColors side={DoubleSide} />
     </mesh>
   );
 }
@@ -263,7 +263,7 @@ export function PowerSurface({
       const maxPower = maxCurrent * maxCurrent * resistance;
       const t = Math.min(1, positions[i * 3 + 1] / maxPower);
       const h = (1 - t) * 0.1;
-      const c = new THREE.Color().setHSL(h, 0.9, 0.5);
+      const c = new Color().setHSL(h, 0.9, 0.5);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -287,17 +287,17 @@ export function PowerSurface({
       }
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(new THREE.BufferAttribute(indices, 1));
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new BufferAttribute(normals, 3));
+    geo.setAttribute('color', new BufferAttribute(colors, 3));
+    geo.setIndex(new BufferAttribute(indices, 1));
     return geo;
   }, [resistance, maxCurrent, resolution]);
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial vertexColors side={THREE.DoubleSide} />
+      <meshStandardMaterial vertexColors side={DoubleSide} />
     </mesh>
   );
 }

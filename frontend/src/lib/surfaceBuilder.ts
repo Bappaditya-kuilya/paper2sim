@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import { BufferAttribute, BufferGeometry, Color } from 'three';
 
 export interface SurfaceGrid {
   positions: Float32Array;
@@ -12,13 +12,13 @@ export interface SurfaceConfig {
   xRange: [number, number];
   yRange: [number, number];
   resolution: number;
-  colorFn?: (z: number, minZ: number, maxZ: number) => THREE.Color;
+  colorFn?: (z: number, minZ: number, maxZ: number) => Color;
 }
 
-const defaultColorFn = (z: number, minZ: number, maxZ: number): THREE.Color => {
+const defaultColorFn = (z: number, minZ: number, maxZ: number): Color => {
   const t = maxZ === minZ ? 0.5 : (z - minZ) / (maxZ - minZ);
   const h = (1.0 - t) * 0.6;
-  return new THREE.Color().setHSL(h, 0.8, 0.5);
+  return new Color().setHSL(h, 0.8, 0.5);
 };
 
 export function generateSurface(
@@ -112,11 +112,11 @@ export function generateSurface(
   };
 }
 
-export function createSurfaceGeometry(grid: SurfaceGrid): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(grid.positions, 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(grid.normals, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(grid.colors, 3));
-  geo.setIndex(new THREE.BufferAttribute(grid.indices, 1));
+export function createSurfaceGeometry(grid: SurfaceGrid): BufferGeometry {
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new BufferAttribute(grid.positions, 3));
+  geo.setAttribute('normal', new BufferAttribute(grid.normals, 3));
+  geo.setAttribute('color', new BufferAttribute(grid.colors, 3));
+  geo.setIndex(new BufferAttribute(grid.indices, 1));
   return geo;
 }

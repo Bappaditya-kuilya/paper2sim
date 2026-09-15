@@ -1,7 +1,7 @@
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
-import * as THREE from 'three';
+import { DoubleSide, type BufferGeometry } from 'three';
 
 export interface Sandbox3DProps {
   children?: React.ReactNode;
@@ -57,7 +57,7 @@ export function Sandbox3D({
 }
 
 export interface SurfaceMeshProps {
-  geometry: THREE.BufferGeometry;
+  geometry: BufferGeometry;
   wireframe?: boolean;
   opacity?: number;
 }
@@ -68,7 +68,7 @@ export function SurfaceMesh({ geometry, wireframe = false, opacity = 1 }: Surfac
       <meshStandardMaterial
         vertexColors
         wireframe={wireframe}
-        side={THREE.DoubleSide}
+        side={DoubleSide}
         transparent={opacity < 1}
         opacity={opacity}
       />

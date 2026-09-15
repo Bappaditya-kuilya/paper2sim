@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import * as THREE from 'three';
+import { Vector3 } from 'three';
 import { Line } from '@react-three/drei';
 
 export interface SlopeFieldProps {
@@ -33,7 +33,7 @@ export function SlopeField({
   solutionSteps = 100,
 }: SlopeFieldProps) {
   const segments = useMemo(() => {
-    const result: Array<{ start: THREE.Vector3; end: THREE.Vector3; color: string }> = [];
+    const result: Array<{ start: Vector3; end: Vector3; color: string }> = [];
     const [xMin, xMax] = xRange;
     const [yMin, yMax] = yRange;
     const dx = (xMax - xMin) / resolution;
@@ -57,8 +57,8 @@ export function SlopeField({
         else if (magnitude > 1) color = '#eab308';
 
         result.push({
-          start: new THREE.Vector3(startX, startY, 0),
-          end: new THREE.Vector3(endX, endY, 0),
+          start: new Vector3(startX, startY, 0),
+          end: new Vector3(endX, endY, 0),
           color,
         });
       }
@@ -67,17 +67,17 @@ export function SlopeField({
   }, [expression, xRange, yRange, resolution]);
 
   const solutionCurves = useMemo(() => {
-    const curves: Array<{ points: THREE.Vector3[]; color: string }> = [];
+    const curves: Array<{ points: Vector3[]; color: string }> = [];
     const [xMin, xMax] = xRange;
     const step = (xMax - xMin) / solutionSteps;
 
     for (const ic of initialConditions) {
-      const points: THREE.Vector3[] = [];
+      const points: Vector3[] = [];
       let x = ic.x;
       let y = ic.y;
 
       for (let i = 0; i < solutionSteps; i++) {
-        points.push(new THREE.Vector3(x, y, 0.01));
+        points.push(new Vector3(x, y, 0.01));
         const slope = evalODE(expression, x, y);
         x += step;
         y += slope * step;

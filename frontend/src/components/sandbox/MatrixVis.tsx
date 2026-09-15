@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import * as THREE from 'three';
+import { Color } from 'three';
 
 export interface MatrixVisProps {
   matrix?: number[][];
@@ -49,8 +49,8 @@ export function MatrixVis({
         row.map((val, ci) => {
           const intensity = Math.abs(val) / maxValue;
           const color = val >= 0
-            ? new THREE.Color().setHSL(0.6, 0.8, 0.3 + intensity * 0.4)
-            : new THREE.Color().setHSL(0, 0.8, 0.3 + intensity * 0.4);
+            ? new Color().setHSL(0.6, 0.8, 0.3 + intensity * 0.4)
+            : new Color().setHSL(0, 0.8, 0.3 + intensity * 0.4);
 
           return (
             <group key={`${ri}-${ci}`} position={[ci * (cellSize + gap), (rows - 1 - ri) * (cellSize + gap), 0]}>
