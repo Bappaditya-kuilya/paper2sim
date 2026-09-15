@@ -3,6 +3,7 @@ export interface Equation {
   type: string;
   template?: string;
   label?: string;
+  vizMode?: '3d' | 'info';
 }
 
 export interface ExtractResponse {
