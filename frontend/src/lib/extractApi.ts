@@ -9,12 +9,6 @@ export interface ExtractResponse {
   warning?: string;
 }
 
-export interface ArxivResponse {
-  title: string;
-  authors: string[];
-  equations: Equation[];
-}
-
 export interface SampleClaim {
   id: string;
   title: string;
@@ -133,25 +127,6 @@ export async function extractUpload(file: File): Promise<ExtractResponse> {
   }
   try {
     return (await res.json()) as ExtractResponse;
-  } catch {
-    throw new Error('Bad response from server');
-  }
-}
-
-export async function fetchArxiv(url: string): Promise<ArxivResponse> {
-  let res: Response;
-  try {
-    res = await fetch(`${apiBase()}/api/arxiv?url=${encodeURIComponent(url)}`, { method: 'GET', signal: AbortSignal.timeout(30000) });
-  } catch (err: unknown) {
-    if ((err as Error)?.name === 'TimeoutError') throw new Error('Request timed out');
-    throw new Error('Could not reach the arXiv lookup server. Check your connection and try again.');
-  }
-  if (!res.ok) {
-    const detail: string = await errorDetail(res);
-    throw new Error(`arXiv lookup failed (${res.status}): ${detail}`);
-  }
-  try {
-    return (await res.json()) as ArxivResponse;
   } catch {
     throw new Error('Bad response from server');
   }
