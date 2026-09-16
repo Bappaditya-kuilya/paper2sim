@@ -12,10 +12,8 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "pydantic>=2.10.0",
-    "httpx>=0.28.0",
     "pymupdf>=1.25.0",
-    "slowapi>=0.1.9",
-    "typer>=0.12.0",
+    "python-multipart>=0.0.18",
 ]
 
 authors = [
@@ -38,11 +36,8 @@ dev = [
     "pre-commit>=3.6.0",
 ]
 
-[project.scripts]
-paper2sim = "paper2sim.cli:main"
-
 [tool.hatch.build.targets.wheel]
-packages = ["src/paper2sim"]
+packages = ["src/paper2sim", "src/eqextract"]
 
 [tool.ruff]
 line-length = 200
@@ -60,7 +55,7 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["src/paper2sim"]
+source = ["src/eqextract"]
 
 [tool.coverage.report]
 exclude_lines = [
