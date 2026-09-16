@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { normalizeInput, stripLatex, addImplicitMultiply, classifyExpression } from '../lib/mathParser';
+import { normalizeInput, stripLatex, addImplicitMultiply, classifyExpression, math, registerCustomFunctions } from '../lib/mathParser';
 
 describe('stripLatex', () => {
   test('strips \\frac{a}{b} to (a)/(b)', () => {
@@ -167,5 +167,14 @@ describe('classifyExpression', () => {
 
   test('defaults to function', () => {
     expect(classifyExpression('x + y')).toBe('function');
+  });
+});
+
+describe('registerCustomFunctions (idempotent)', () => {
+  test('sigmoid(0)≈0.5 and relu(-1)===0 via shared math instance', () => {
+    registerCustomFunctions();
+    registerCustomFunctions();
+    expect(Math.abs((math.evaluate('sigmoid(0)') as number) - 0.5)).toBeLessThan(1e-9);
+    expect(math.evaluate('relu(-1)') as number).toBe(0);
   });
 });
