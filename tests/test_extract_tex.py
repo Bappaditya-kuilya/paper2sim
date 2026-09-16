@@ -62,6 +62,17 @@ def test_text_extraction_skips_prose_keeps_greek():
     assert any("\u03b1 + \u03b2" in e["latex"] for e in eqs)  # §9.3: Greek must not be garbage
 
 
+def test_bare_function_call_extracted_as_function():
+    """y=sin(x) carries no operator — must still reach the plot path."""
+    eqs = eqextract.extract_equations_from_text("y=sin(x)\n")
+    assert len(eqs) == 1
+    assert eqs[0]["type"] == "function_def"
+
+
+def test_implication_arrow_is_unknown():
+    assert eqextract.classify_equation("a=>b") == "unknown"
+
+
 def test_manim_map_gone():
     assert not hasattr(eqextract, "select_templates")
     assert not hasattr(eqextract, "_template_for_type")
@@ -72,3 +83,22 @@ def test_manim_map_gone():
     assert "import openai" not in src and "from openai" not in src
 
 
+def test_classify_plain_text_forms():
+    """Paste/type path carries no TeX commands — must still route (phase 6 fix)."""
+    cases = {
+        "y = sin(k*x) + c": "function_def",
+        "f(x) = x^2 + 2*x + 1": "function_def",
+        "y = e^x": "function_def",
+        "z = x^2 + y^2": "function_def",
+        "y = 2x + 1": "function_def",
+        "y = mx + c": "function_def",
+        "x^2 = 4": "function_def",
+        "E = mc^2": "equation",
+        "a^2 + b^2 = c^2": "equation",
+        "y = mx + b": "function_def",
+        "x -> 0": "unknown",  # arrow, not inequality
+        "x < y + 1": "inequality",
+        "hello world": "unknown",
+    }
+    for latex, want in cases.items():
+        assert eqextract.classify_equation(latex) == want, latex
