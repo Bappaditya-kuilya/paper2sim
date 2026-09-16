@@ -47,3 +47,4 @@ fly.md
 media/
 rendered_videos/
 data/
+.env*
