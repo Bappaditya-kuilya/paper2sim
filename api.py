@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Paper2Sim API", version="1.0.0")
 
-_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+_cors_origins = [o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins or ["http://localhost:5173"],
