@@ -1,87 +1,101 @@
-"""Paper2Sim API — FastAPI backend for equation extraction and visualization."""
+"""Paper2Sim API — slim extract-only backend (plan.md §8)."""
 
-import asyncio
+import hashlib
+import json
 import logging
 import os
-import re
 import tempfile
 import time
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
-from pydantic import BaseModel, ValidationError
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from fastapi.responses import Response
+from pydantic import BaseModel
 
-from paper2sim import jobs as job_store
-from paper2sim.arxiv import download_pdf, download_source, get_paper_info, parse_arxiv_url
-from paper2sim.equations import classify_equation, extract_equations_from_tex, select_templates
-from paper2sim.breakdown_client import breakdown_equations
-from paper2sim.pipeline import run_pipeline
-from paper2sim.storyboard_client import generate_storyboard
+try:
+    from eqextract.cache import cache_get as _cget
+    from eqextract.cache import cache_set as _cset
+except ImportError:
+    try:
+        from src.eqextract.cache import cache_get as _cget
+        from src.eqextract.cache import cache_set as _cset
+    except ImportError:
+
+        def _cget(key: str, max_age_s: float) -> str | None:
+            return None
+
+        def _cset(key: str, val: str) -> None:
+            return None
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-if os.environ.get("SENTRY_DSN"):  # text.md §2.3: 5K errors/mo free; inert without DSN
-    try:
-        import sentry_sdk
+app = FastAPI(title="Paper2Sim API", version="1.0.0")
 
-        sentry_sdk.init(dsn=os.environ["SENTRY_DSN"])
-    except ImportError:
-        logger.warning("SENTRY_DSN set but sentry-sdk not installed")
-
-limiter = Limiter(key_func=get_remote_address)
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins or ["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ExtractRequest(BaseModel):
-    source: str  # "arxiv_url" | "pdf_upload" | "text"
-    url: str | None = None
-    text: str | None = None
+    source: Literal["arxiv_url", "text"]
+    value: str
 
 
-class Equation(BaseModel):
-    latex: str
-    type: str
-    label: str | None = None
-    template: str | None = None
+_ARXIV_TTL = 86400
+_EMPTY_TTL = 300
+_MAX_TEXT = 100_000
+_MAX_PDF_BYTES = 20 * 1024 * 1024
+_MAX_PDF_PAGES = 30
+_MAX_CANDIDATES = 200
+_BLOCK_CHARS = 2000
 
 
-class ExtractResponse(BaseModel):
-    equations: list[Equation]
-    paper_info: dict | None = None
+def _json_get(key: str, ttl: int):
+    try:
+        raw = _cget(key, ttl)
+    except Exception:
+        return None
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
 
 
-class BreakdownRequest(BaseModel):
-    pdf_path: str | None = None
-    text: str | None = None
-    model: str = "openai/gpt-oss-120b"
+def _json_set(key: str, val) -> None:
+    try:
+        _cset(key, json.dumps(val))
+    except Exception:
+        pass
 
 
-class StoryboardRequest(BaseModel):
-    topic: dict
-    source_text: str = ""
+def _empty_key(value: str) -> str:
+    # ponytail: lone surrogates break utf-8 encode → replace (trust boundary)
+    return "empty:" + hashlib.sha256(value.encode("utf-8", errors="replace")).hexdigest()
 
 
-# In-memory TTL cache
-_cache: dict[str, tuple[float, any]] = {}
-CACHE_TTL = 3600  # 1 hour
+class _CacheView:
+    """Back-compat for `api._cache` membership probes (failure-never-cached)."""
+
+    def __contains__(self, key: object) -> bool:
+        try:
+            k = str(key)
+            ttl = _ARXIV_TTL if k.startswith("arxiv:") else _EMPTY_TTL
+            return _cget(k, ttl) is not None
+        except Exception:
+            return False
 
 
-def cache_get(key: str):
-    if key in _cache:
-        ts, val = _cache[key]
-        if time.time() - ts < CACHE_TTL:
-            return val
-        del _cache[key]
-    return None
-
-
-def cache_set(key: str, val):
-    _cache[key] = (time.time(), val)
+_cache = _CacheView()
 
 
 def _block_math_score(text: str) -> int:
@@ -92,20 +106,73 @@ def _block_math_score(text: str) -> int:
     return score
 
 
-app = FastAPI(
-    title="Paper2Sim API",
-    description="Extract equations from papers and visualize them interactively",
-    version="0.2.0",
-)
+_EQ_FUNCS = ("parse_arxiv_url", "download_source", "get_paper_info", "extract_equations_from_tex", "extract_equations_from_text", "classify_equation")
 
-app.state.limiter = limiter
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+def _eq():
+    """Lazily load eqextract: installed package first (Docker/CI `pip install .`),
+    src-layout fallback for dev without install. Exactly one branch runs per process."""
+    try:
+        import eqextract as mod
+    except ImportError:
+        try:
+            from src import eqextract as mod
+        except ImportError:
+            raise HTTPException(status_code=502, detail="equation extractor not available (eqextract missing)")
+    missing = [n for n in _EQ_FUNCS if not callable(getattr(mod, n, None))]
+    if missing:
+        raise HTTPException(status_code=502, detail=f"equation extractor incomplete (missing: {', '.join(missing)})")
+    return mod
+
+
+def _norm_eq(item, classify) -> dict:
+    latex, etype, label = "", None, None
+    if isinstance(item, str):
+        latex = item
+    elif isinstance(item, dict):
+        latex = item.get("latex", item.get("equation", item.get("text", "")))
+        etype, label = item.get("type"), item.get("label")
+    if not isinstance(latex, str):
+        latex = str(latex)
+    if latex.strip() and not etype:
+        try:
+            etype = classify(latex)
+        except Exception:
+            etype = None
+    eq = {"latex": latex, "type": etype if isinstance(etype, str) and etype else "unknown"}
+    if isinstance(label, str) and label:
+        eq["label"] = label
+    return eq
+
+
+def _fetch_arxiv(arxiv_id: str, mod) -> tuple[list[dict], dict, str | None]:
+    """Download + extract. Returns (equations, info, warning). Raises on fetch failure."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = Path(tmpdir)
+        mod.download_source(arxiv_id, str(dest))  # raises on failure
+        tex_files = sorted(dest.rglob("*.tex"))
+        if tex_files:
+            content = max(tex_files, key=lambda p: p.stat().st_size).read_text(errors="replace")
+            try:
+                raw = mod.extract_equations_from_tex(content)
+            except Exception:
+                logger.exception("tex extraction failed")
+                return [], {}, "extraction failed"
+            return [_norm_eq(e, mod.classify_equation) for e in raw], {}, None
+        info = mod.get_paper_info(arxiv_id) or {}
+        abstract = info.get("summary") or info.get("abstract") or ""
+        try:
+            raw = mod.extract_equations_from_text(abstract) if abstract.strip() else []
+        except Exception:
+            logger.exception("abstract extraction failed")
+            return [], info, "extraction failed"
+        return [_norm_eq(e, mod.classify_equation) for e in raw], info, "no tex source; extracted from abstract"
+
+
+@app.get("/")
+async def root():
+    """Backend sanity check — API only, UI lives on the frontend origin."""
+    return {"status": "ok"}
 
 
 @app.get("/health")
@@ -119,222 +186,147 @@ async def health_head():
     return Response(status_code=200)
 
 
-@app.get("/health/dependencies")
-async def health_deps():
-    deps = {}
-    try:
-        import fitz
-        deps["pymupdf"] = "ok"
-    except ImportError:
-        deps["pymupdf"] = "missing"
-    try:
-        import fastapi
-        deps["fastapi"] = "ok"
-    except ImportError:
-        deps["fastapi"] = "missing"
-    return deps
-
-
 @app.post("/api/extract")
-@limiter.limit("10/minute")
-async def extract(req: ExtractRequest, request: Request):
-    if req.source == "arxiv_url" and req.url:
-        arxiv_id = parse_arxiv_url(req.url)
-        if not arxiv_id:
-            return {"error": "Invalid arXiv URL"}
-        cached = cache_get(f"arxiv:{arxiv_id}")
-        if cached:
-            return cached
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dest = Path(tmpdir)
-            source_path = download_source(arxiv_id, str(dest))
-            if source_path:
-                tex_files = list(dest.rglob("*.tex"))
-                if tex_files:
-                    tex_content = tex_files[0].read_text(errors="replace")
-                    equations = extract_equations_from_tex(tex_content)
-                    for eq in equations:
-                        eq["type"] = classify_equation(eq["latex"])
-                    result = select_templates(equations)
-                    response = ExtractResponse(
-                        equations=[Equation(
-                            latex=e["equation"],
-                            type=classify_equation(e["equation"]),
-                            template=e.get("template"),
-                        ) for e in result],
-                        paper_info={"arxiv_id": arxiv_id},
-                    )
-                    cache_set(f"arxiv:{arxiv_id}", response)
-                    return response
-            pdf_path = download_pdf(arxiv_id, str(dest))
-            if pdf_path:
-                return {"error": "PDF extraction not yet implemented"}
-        return {"error": "Failed to download paper"}
-    elif req.source == "text" and req.text:
-        equations = [{"latex": req.text, "type": "display"}]
-        equations[0]["type"] = classify_equation(req.text)
-        result = select_templates(equations)
-        return ExtractResponse(equations=[Equation(
-            latex=e["equation"],
-            type=classify_equation(e["equation"]),
-            template=e.get("template"),
-        ) for e in result])
-    return {"error": "Invalid request"}
-
-
-@app.post("/api/breakdown")
-async def breakdown(req: BreakdownRequest):
-    equations = [{"latex": req.text or "", "type": "unknown"}]
-    result = breakdown_equations(equations, model=req.model)
-    return result
-
-
-@app.post("/api/storyboard")
-async def storyboard(req: StoryboardRequest):
-    result = generate_storyboard(req.topic, req.source_text)
-    return result
+async def extract(req: ExtractRequest):
+    # ponytail: lone surrogates break JSONResponse utf-8 encode → replace upfront
+    value = req.value.encode("utf-8", errors="replace").decode("utf-8")
+    if len(value) > _MAX_TEXT:
+        raise HTTPException(status_code=400, detail="value exceeds 100000 chars")
+    mod = _eq()
+    if req.source == "text":
+        if not value.strip():
+            return {"equations": []}
+        ekey = _empty_key(value)
+        if _cget(ekey, _EMPTY_TTL) is not None:
+            return {"equations": []}
+        try:
+            raw = mod.extract_equations_from_text(value)
+        except Exception:
+            logger.exception("text extraction failed")
+            return {"equations": [], "warning": "extraction failed"}
+        eqs = [_norm_eq(e, mod.classify_equation) for e in raw]
+        if not eqs:
+            _cset(ekey, '{"equations": []}')
+            return {"equations": []}
+        return {"equations": eqs}
+    try:
+        arxiv_id = mod.parse_arxiv_url(req.value)
+    except Exception:
+        arxiv_id = None
+    if not arxiv_id:
+        raise HTTPException(status_code=400, detail="invalid_id")
+    cached = _json_get(f"arxiv:{arxiv_id}", _ARXIV_TTL)
+    if cached is not None:
+        return cached
+    try:
+        equations, _, warning = _fetch_arxiv(arxiv_id, mod)
+    except Exception:
+        logger.exception("arxiv extract failed")
+        raise HTTPException(status_code=502, detail="arxiv_unavailable")
+    resp: dict = {"equations": equations}
+    if warning:
+        resp["warning"] = warning
+    _json_set(f"arxiv:{arxiv_id}", resp)
+    return resp
 
 
 @app.post("/api/extract/upload")
 async def extract_upload(file: UploadFile = File(...)):
-    """Extract equations from uploaded PDF."""
-    if not file.filename.endswith(".pdf"):
-        return {"error": "Only PDF files supported"}
+    """Extract equations from an uploaded PDF (block-score, capped)."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="missing filename")
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="only PDF files supported")
+    content = await file.read(_MAX_PDF_BYTES + 1)
+    if len(content) > _MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF exceeds 20MB")
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="not a PDF file")
+    try:
+        import fitz
+    except ImportError:
+        raise HTTPException(status_code=502, detail="PDF support not available (pymupdf missing)")
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
     try:
-        import fitz
         doc = fitz.open(tmp_path)
-        candidates: list[str] = []
-        for page in doc:
-            blocks = sorted(page.get_text("blocks"), key=lambda b: (b[1], b[0]))
-            for b in blocks:
-                if b[6] != 0:
-                    continue
-                cleaned = " ".join(line.strip() for line in b[4].splitlines() if line.strip())
-                if cleaned and _block_math_score(cleaned) > 0:
-                    candidates.append(cleaned)
-        doc.close()
-        equations = [{"latex": t, "type": "display"} for t in candidates]
-        for eq in equations:
-            eq["type"] = classify_equation(eq["latex"])
-        result = select_templates(equations)
-        return ExtractResponse(
-            equations=[Equation(
-                latex=e["equation"],
-                type=classify_equation(e["equation"]),
-                template=e.get("template"),
-            ) for e in result],
-            paper_info={"filename": file.filename},
-        )
-    except Exception as e:
-        return {"error": f"PDF extraction failed: {e}"}
+        try:
+            candidates: list[str] = []
+            truncated = False
+            for i, page in enumerate(doc):
+                if i >= _MAX_PDF_PAGES:
+                    truncated = True
+                    break
+                for b in sorted(page.get_text("blocks"), key=lambda b: (b[1], b[0])):
+                    if len(candidates) >= _MAX_CANDIDATES:
+                        truncated = True
+                        break
+                    if b[6] != 0:
+                        continue
+                    cleaned = " ".join(line.strip() for line in b[4].splitlines() if line.strip())
+                    if cleaned and _block_math_score(cleaned) > 0:
+                        candidates.append(cleaned[:_BLOCK_CHARS])
+                if len(candidates) >= _MAX_CANDIDATES:
+                    truncated = True
+                    break
+        finally:
+            doc.close()
+    except Exception:
+        logger.exception("PDF extraction failed")
+        return {"equations": [], "warning": "PDF extraction failed"}
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+    try:
+        classify = _eq().classify_equation
+    except HTTPException:
+        classify = None
+    equations = [_norm_eq(t, classify or (lambda s: "unknown")) for t in candidates]
+    resp = {"equations": equations}
+    if truncated:
+        resp["warning"] = f"truncated to first {_MAX_PDF_PAGES} pages / {_MAX_CANDIDATES} candidates"
+    return resp
 
 
-MAX_UPLOAD_MB = 20
-MAX_SUBMIT_TEXT = 100000
-_ARTIFACT_RE = re.compile(r"^figure_\d+\.(png|gif)$")
-
-
-def _data_dir() -> Path:
-    return Path(os.environ.get("DATA_DIR", "./data"))
-
-
-@app.post("/api/papers")
-@limiter.limit("20/hour")
-async def submit_paper(
-    request: Request,
-    background: BackgroundTasks,
-    file: UploadFile | None = File(default=None),
-    arxiv: str | None = Form(default=None),
-    text: str | None = Form(default=None),
-    title: str | None = Form(default=None),
-):
-    """Submit a paper for the 5-stage pipeline. Exactly one of file/arxiv/text. Bad input → 400."""
-    has_file = file is not None and bool(file.filename)
-    has_arxiv = bool(arxiv and arxiv.strip())
-    has_text = bool(text and text.strip())
-    if sum((has_file, has_arxiv, has_text)) != 1:
-        raise HTTPException(status_code=400, detail="Provide exactly one of: file (PDF), arxiv id/URL, or text")
-    if has_arxiv:
-        arxiv_id = parse_arxiv_url(arxiv.strip())
-        if not arxiv_id:
-            raise HTTPException(status_code=400, detail="Invalid arXiv id or URL")
-        job = job_store.create(source_kind="arxiv", source_ref=arxiv_id, title=(title or arxiv_id).strip()[:200])
-    elif has_text:
-        if len(text) > MAX_SUBMIT_TEXT:
-            raise HTTPException(status_code=400, detail=f"Pasted text exceeds {MAX_SUBMIT_TEXT} chars")
-        job = job_store.create(source_kind="text", source_ref=text.strip(), title=(title or text.strip()[:80]).strip()[:200])
-    else:
-        if not file.filename.endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="Only PDF files supported")
-        content = await file.read()
-        if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
-            raise HTTPException(status_code=400, detail=f"PDF exceeds {MAX_UPLOAD_MB}MB")
-        job = job_store.create(source_kind="pdf", source_ref=file.filename, title=(title or file.filename).strip()[:200])
-        upath = _data_dir() / "uploads" / f"{job['id']}.pdf"
-        upath.parent.mkdir(parents=True, exist_ok=True)
-        upath.write_bytes(content)
-        job_store.update(job["id"], upload_path=str(upath))
-        job = job_store.get(job["id"])
-    background.add_task(run_pipeline, job["id"])
-    return {"job_id": job["id"]}
-
-
-@app.get("/api/jobs")
-async def list_jobs():
-    return {"jobs": job_store.list_recent()}
-
-
-@app.get("/api/jobs/{job_id}")
-async def get_job(job_id: str):
-    job = job_store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Unknown job id")
-    return job
-
-
-@app.get("/api/jobs/{job_id}/artifacts/{fname}")
-async def get_artifact(job_id: str, fname: str):
-    if not _ARTIFACT_RE.match(fname):
-        raise HTTPException(status_code=404, detail="Unknown artifact")
-    job = job_store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Unknown job id")
-    if fname not in [str(a).split("/")[-1] for a in job.get("artifacts", [])]:
-        raise HTTPException(status_code=404, detail="Unknown artifact")
-    run = next((str(a).split("/")[0] for a in job["artifacts"] if str(a).endswith(fname)), "")
-    base = (_data_dir() / "artifacts" / job_id).resolve()
-    path = (base / run / fname).resolve()
-    if not str(path).startswith(str(base)) or not path.is_file():
-        raise HTTPException(status_code=404, detail="Unknown artifact")
-    return FileResponse(path)
-
-
-@app.exception_handler(ValidationError)
-async def validation_error_handler(request: Request, exc: ValidationError):
-    return JSONResponse(status_code=422, content={"error": "Validation error", "details": exc.errors()})
-
-
-@app.exception_handler(Exception)
-async def generic_error_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled error: {exc}")
-    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+@app.get("/api/arxiv")
+async def arxiv_lookup(url: str):
+    mod = _eq()
+    try:
+        arxiv_id = mod.parse_arxiv_url(url)
+    except Exception:
+        arxiv_id = None
+    if not arxiv_id:
+        raise HTTPException(status_code=400, detail="invalid_id")
+    cached = _json_get(f"arxiv:{arxiv_id}", _ARXIV_TTL)
+    if cached is not None:
+        return cached
+    try:
+        equations, info, _ = _fetch_arxiv(arxiv_id, mod)
+        if not info:
+            try:
+                info = mod.get_paper_info(arxiv_id) or {}
+            except Exception:
+                info = {}
+    except Exception:
+        logger.exception("arxiv lookup failed")
+        raise HTTPException(status_code=502, detail="arxiv_unavailable")
+    authors = info.get("authors") or []
+    if authors and isinstance(authors[0], dict):
+        authors = [a.get("name", "") for a in authors]
+    resp = {"title": info.get("title") or arxiv_id, "authors": authors, "equations": equations}
+    _json_set(f"arxiv:{arxiv_id}", resp)
+    return resp
 
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
-    duration = time.time() - start
-    logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({duration:.3f}s)")
+    logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({time.time() - start:.3f}s)")
     return response
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, workers=2)
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
