@@ -1,182 +1,268 @@
-import { useState, useCallback, useEffect } from 'react'
-import { Toaster } from 'react-hot-toast'
-import { Header } from './components/Header'
-import { Sidebar } from './components/Sidebar'
-import { MainContent } from './components/MainContent'
-import { PaperInput } from './components/PaperInput'
-import { EquationList } from './components/EquationList'
-import { JobsView } from './components/JobsView'
-import { ProgressTracker } from './components/ProgressTracker'
-import { Sandbox3D, MathSurface } from './components/sandbox'
-import { EquationInfo } from './components/EquationInfo'
-import { SettingsPanel, ExportMenu } from './components/ui/ExportMenu'
-import { classifyExpression } from './lib/mathParser'
-import { getSampleEquations } from './lib/sampleData'
-import { showToast } from './components/Toast'
-import { useExtract } from './hooks/useExtract'
-import type { Equation } from './types'
+import { useCallback, useEffect, useState } from 'react';
+import { checkBackend, type Equation, type ExtractResponse } from './lib/extractApi';
+import { hintFor, showDimensionToggle } from './lib/plotMeta';
+import { InputTabs } from './components/InputTabs';
+import { EqList } from './components/EqList';
+import { Plot2D } from './components/Plot2D';
+import { Viewer3D } from './components/Viewer3D';
+import { ParamPanel } from './components/ParamPanel';
+import {
+  DEFAULT_VIEWER_PARAMS,
+  type ParamPatch,
+  type ViewerParams,
+} from './lib/viewerParams';
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+type BackendState = 'checking' | 'up' | 'down';
 
-const STEPS = ['Extract', 'Classify', 'Visualize', 'Render']
+function eqText(eq: Equation): string {
+  const r = eq as unknown as Record<string, unknown>;
+  const v = r['latex'] ?? r['equation'];
+  return typeof v === 'string' ? v : '';
+}
+
+function eqType(eq: Equation): string {
+  const r = eq as unknown as Record<string, unknown>;
+  const v = r['type'];
+  return typeof v === 'string' ? v : 'unknown';
+}
+
+function sampleEquations(): Equation[] {
+  return [
+    { latex: 'y = sin(k*x)', type: 'trigonometric' },
+    { latex: 'y = x^2 + 2*x + 1', type: 'polynomial' },
+  ] as unknown as Equation[];
+}
+
+function focusTabField() {
+  document.getElementById('inputtabs-field')?.focus();
+}
 
 export default function App() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [activeView, setActiveView] = useState<'extract' | 'render' | 'settings' | 'jobs'>('extract')
-  const [renderingEquation, setRenderingEquation] = useState<Equation | null>(null)
-  const [currentStep, setCurrentStep] = useState(0)
+  const [backend, setBackend] = useState<BackendState>('checking');
+  const [busy, setBusy] = useState(false);
+  const [equations, setEquations] = useState<Equation[]>([]);
+  const [selected, setSelected] = useState(0);
+  const [title, setTitle] = useState('');
+  const [attempted, setAttempted] = useState(false);
+  const [cause, setCause] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
+  const [params, setParams] = useState<ViewerParams>(DEFAULT_VIEWER_PARAMS);
 
-  const { equations, loading: extractLoading, error: extractError, extract, extractUpload, retry, backendDown, setEquations } = useExtract()
-
-  useEffect(() => {
-    if (API_BASE) {
-      fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(15000) }).catch(() => {})
+  const runCheck = useCallback(async () => {
+    setBackend('checking');
+    try {
+      const ok = await checkBackend();
+      setBackend(ok ? 'up' : 'down');
+    } catch {
+      setBackend('down');
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    if (extractError) showToast(extractError, 'error')
-  }, [extractError])
+    let live = true;
+    checkBackend()
+      .then((ok) => { if (live) setBackend(ok ? 'up' : 'down'); })
+      .catch(() => { if (live) setBackend('down'); });
+    return () => { live = false; };
+  }, []);
 
-  useEffect(() => {
-    if (equations.length > 0) setCurrentStep(1) // eslint-disable-line react/set-state-in-effect
-  }, [equations])
+  const handleResult = useCallback((r: ExtractResponse, t: string) => {
+    const warning = r.warning;
+    setEquations(r.equations ?? []);
+    setSelected(0);
+    setViewMode('2d');
+    setTitle(t);
+    setAttempted(true);
+    setCause(typeof warning === 'string' && warning ? warning : null);
+    setNotice(null);
+    setCopied(false);
+  }, []);
 
-  const handleAnalyze = useCallback((payload: { mode: string; value: string | File }) => {
-    setCurrentStep(0)
-    setRenderingEquation(null)
-    setActiveView('extract')
-    if (payload.mode === 'pdf' && payload.value instanceof File) {
-      extractUpload(payload.value)
-      return
-    }
-    const mode = payload.mode === 'arxiv' ? 'url' : 'text'
-    const url = mode === 'url' ? (payload.value as string) : undefined
-    const text = mode === 'text' ? String(payload.value) : undefined
-    extract(mode, url, text)
-  }, [extract, extractUpload])
+  const handleInlineError = useCallback((msg: string) => {
+    setNotice(msg);
+  }, []);
 
   const handleSample = useCallback(() => {
-    setCurrentStep(1)
-    setRenderingEquation(null)
-    setActiveView('extract')
-    setEquations(getSampleEquations())
-    showToast('Sample loaded — no backend needed')
-  }, [setEquations])
+    setEquations(sampleEquations());
+    setSelected(0);
+    setViewMode('2d');
+    setTitle('Sample');
+    setAttempted(true);
+    setCause(null);
+    setNotice(null);
+    setCopied(false);
+  }, []);
 
-  const handleSelectEquation = useCallback((eq: Equation) => {
-    setRenderingEquation(eq)
-    setCurrentStep(2)
-    setActiveView('render')
-    showToast(`Visualizing: ${eq.type}`)
-  }, [])
+  const handleSelect = useCallback((i: number) => {
+    setSelected(i);
+    setViewMode('2d');
+  }, []);
 
-  const handleExport = useCallback((format: 'svg' | 'png' | 'json') => {
-    if (!renderingEquation) return
-    if (format === 'json') {
-      const blob = new Blob([JSON.stringify(renderingEquation, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'equation.json'
-      a.click()
-      URL.revokeObjectURL(url)
-    } else if (format === 'png') {
-      const canvas = document.querySelector('#equation-viewport canvas')
-      if (canvas instanceof HTMLCanvasElement) {
-        const a = document.createElement('a')
-        a.href = canvas.toDataURL('image/png')
-        a.download = 'visualization.png'
-        a.click()
-      } else {
-        showToast('3D view not available for PNG export', 'error')
-      }
+  const handleParams = useCallback((patch: ParamPatch) => {
+    setParams((p) => ({ ...p, ...patch }));
+  }, []);
+
+  const handleCopy = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setNotice('Copy failed — select the text manually.');
     }
-  }, [renderingEquation])
+  }, []);
 
-  const modelType = renderingEquation ? classifyExpression(renderingEquation.latex) : 'function'
+  const selectedEq = equations[selected] ?? equations[0] ?? null;
+  const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${equations.length} equations${title ? ` — ${title}` : ''}` : ''));
+  const showZero = attempted && !busy && equations.length === 0;
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-900 text-zinc-100">
-      <Toaster position="top-right" />
-      <Header mobileOpen={mobileOpen} onToggleMobile={() => setMobileOpen((o) => !o)} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          mobileOpen={mobileOpen}
-          activeItem={activeView}
-          onNavigate={(id) => setActiveView(id as 'extract' | 'render' | 'settings' | 'jobs')}
-          onClose={() => setMobileOpen(false)}
-        />
-        <MainContent>
-          {activeView === 'jobs' ? (
-            <JobsView />
-          ) : activeView === 'settings' ? (
-            <div className="mx-auto max-w-lg space-y-6">
-              <SettingsPanel
-                onSettingsChange={(s) => showToast(`Settings: ${JSON.stringify(s)}`)}
-                onCameraReset={() => showToast('Camera reset')}
-              />
+    <div className="min-h-screen bg-zinc-900 text-zinc-100">
+      <main className="mx-auto w-full max-w-3xl px-4 py-6 md:py-8">
+        <h1 className="mb-1 text-xl font-semibold">Equation to Plot</h1>
+        <p className="mb-5 text-sm text-zinc-400">Paste any paper math, play with it live.</p>
+
+        {backend === 'down' && (
+          <div className="mb-4 rounded-lg border border-red-900/60 bg-red-950/30 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium text-red-200">Can&apos;t reach server</p>
+              <button
+                type="button"
+                onClick={() => void runCheck()}
+                className="min-h-[44px] rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+              >
+                Retry
+              </button>
             </div>
-          ) : activeView === 'render' && renderingEquation ? (
-            <div className="mx-auto max-w-4xl space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-zinc-400">Equation Details</h2>
-                <div className="flex items-center gap-2">
-                  <ExportMenu
-                    formats={['png', 'json']}
-                    onExport={handleExport}
-                  />
-                  <button
-                    onClick={() => setActiveView('extract')}
-                    className="text-xs text-zinc-500 hover:text-zinc-300"
-                  >
-                    Back to equations
-                  </button>
-                </div>
+          </div>
+        )}
+
+        <InputTabs
+          onResult={handleResult}
+          onInlineError={handleInlineError}
+          busy={busy}
+          onBusy={setBusy}
+          defaultSample={handleSample}
+        />
+
+        <p aria-live="polite" className="mt-3 min-h-[20px] text-sm text-zinc-400">
+          {backend === 'checking' && !busy ? 'Checking server…' : status}
+        </p>
+
+        <div className="mt-4">
+          {showZero ? (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-6 text-center">
+              <p className="text-sm font-medium text-zinc-200">No equations found</p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-zinc-400">
+                {cause ?? 'No extractable math detected in that input.'}
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                <button
+                  type="button"
+                  onClick={handleSample}
+                  className="min-h-[44px] rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                >
+                  Try sample
+                </button>
+                <button
+                  type="button"
+                  onClick={focusTabField}
+                  className="min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                >
+                  Edit input
+                </button>
               </div>
-              <EquationInfo equation={renderingEquation} />
-              {renderingEquation.vizMode === '3d' && (
-                <div>
-                  <h3 className="text-sm font-medium text-zinc-400 mb-3">Interactive 3D</h3>
-                  <div id="equation-viewport" className="h-96">
-                    <Sandbox3D>
-                      <MathSurface
-                        expression={renderingEquation.latex}
-                        modelType={modelType}
-                      />
-                    </Sandbox3D>
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
-            <div className="mx-auto max-w-4xl space-y-6">
-              <ProgressTracker currentStep={currentStep} steps={STEPS} />
-              <PaperInput onAnalyze={handleAnalyze} onSample={handleSample} loading={extractLoading} />
-              {backendDown && !extractLoading ? (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-red-900/60 bg-red-950/30 py-12 text-center">
-                  <p className="text-sm font-medium text-red-200">Can&apos;t reach the analysis server</p>
-                  <p className="mt-1 max-w-md text-xs text-zinc-400">
-                    Nothing from your paper yet. The free-tier backend sleeps when idle — first load can take about a minute.
-                  </p>
-                  <button
-                    onClick={retry}
-                    className="mt-4 rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                <EquationList
-                  equations={equations}
-                  loading={extractLoading}
-                  onSelect={handleSelectEquation}
-                />
+            <>
+              {equations.length > 0 && (
+                <p className="mb-3 text-sm text-zinc-400">
+                  {equations.length} equations{title ? ` — ${title}` : ''}
+                </p>
               )}
-            </div>
+              <EqList equations={equations} selected={selected} onSelect={handleSelect} loading={busy} />
+              {selectedEq && !busy && (
+                <section aria-label="Selected equation" className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">
+                      {eqType(selectedEq)}
+                    </span>
+                  </div>
+                  <p
+                    role="img"
+                    aria-label={`Selected equation: ${eqText(selectedEq)}`}
+                    className="break-words font-mono text-sm text-zinc-100"
+                  >
+                    {eqText(selectedEq)}
+                  </p>
+                  <div className="mt-3">
+                    {showDimensionToggle(eqType(selectedEq), eqText(selectedEq)) ? (
+                      <>
+                        <div
+                          role="radiogroup"
+                          aria-label="Plot dimension"
+                          className="mb-3 flex gap-2"
+                        >
+                          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 has-checked:border-zinc-400 has-checked:bg-zinc-900 has-checked:text-zinc-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-zinc-400">
+                            <input
+                              type="radio"
+                              name="plot-dimension"
+                              value="2d"
+                              checked={viewMode === '2d'}
+                              onChange={() => setViewMode('2d')}
+                              className="h-4 w-4 accent-emerald-400"
+                            />
+                            2D
+                          </label>
+                          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 has-checked:border-zinc-400 has-checked:bg-zinc-900 has-checked:text-zinc-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-zinc-400">
+                            <input
+                              type="radio"
+                              name="plot-dimension"
+                              value="3d"
+                              checked={viewMode === '3d'}
+                              onChange={() => setViewMode('3d')}
+                              className="h-4 w-4 accent-emerald-400"
+                            />
+                            3D
+                          </label>
+                        </div>
+                        {viewMode === '2d' ? (
+                          <Plot2D equation={selectedEq} />
+                        ) : (
+                          <>
+                            <Viewer3D
+                              latex={eqText(selectedEq)}
+                              xRange={params.xRange}
+                              yRange={params.yRange}
+                              resolution={params.resolution}
+                              showGrid={params.showGrid}
+                              showAxes={params.showAxes}
+                              wireframe={params.wireframe}
+                            />
+                            <ParamPanel {...params} onChange={handleParams} />
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <Plot2D equation={selectedEq} />
+                    )}
+                    <p className="mt-2 text-xs text-zinc-400">{hintFor(eqType(selectedEq))}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopy(eqText(selectedEq))}
+                    className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </section>
+              )}
+            </>
           )}
-        </MainContent>
-      </div>
+        </div>
+      </main>
     </div>
-  )
+  );
 }
