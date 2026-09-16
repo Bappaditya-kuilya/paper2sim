@@ -228,6 +228,9 @@ export function normalizeInput(input: string): string {
 
   s = stripLatex(s);
 
+  // mathjs bundle has log/log10/log2 but no ln alias: map standard ln(x) to log(x).
+  s = s.replace(/\bln\s*\(/g, 'log(');
+
   for (const [word, symbol] of Object.entries(WORD_MAP).sort((a, b) => b[0].length - a[0].length)) {
     s = s.split(word).join(symbol);
   }
@@ -274,6 +277,8 @@ export function registerCustomFunctions() {
     step: (x: number, threshold: number = 0) => x >= threshold ? 1 : 0,
   }, { override: true });
 }
+
+registerCustomFunctions();
 
 export { math };
 export type { MathJsStatic } from 'mathjs';
