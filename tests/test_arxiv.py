@@ -149,3 +149,115 @@ def test_failures_never_cached(monkeypatch):
     r = client.get("/api/arxiv", params={"url": f"https://arxiv.org/abs/{arxiv_id}"})
     assert r.status_code == 200, r.text
     assert r.json()["equations"], "retry after failure must succeed (nothing stale cached)"
+
+
+import gzip as _gzip
+
+
+def test_download_source_gzipped_single_tex(monkeypatch, tmp_path):
+    tex = b"\\documentclass{article}\\begin{document}\\section{Hi} $x$ \\end{document}"
+    monkeypatch.setattr(arxiv_mod, "_read_url", lambda url: (_gzip.compress(tex), "application/octet-stream"))
+    out = arxiv_mod.download_source("2301.12345", str(tmp_path / "gz-tex"))
+    assert out is not None and out.name == "source.tex" and out.exists()
+    assert "\\documentclass" in out.read_text()
+
+
+def test_download_source_gzipped_pdf_rejected(monkeypatch, tmp_path):
+    monkeypatch.setattr(arxiv_mod, "_read_url", lambda url: (_gzip.compress(b"%PDF-1.4 binary-body"), "application/octet-stream"))
+    assert arxiv_mod.download_source("2301.12345", str(tmp_path / "gz-pdf")) is None
+
+
+def test_download_source_gzipped_html_rejected(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        arxiv_mod,
+        "_read_url",
+        lambda url: (_gzip.compress(b"<html><body>not found</body></html>"), "application/octet-stream"),
+    )
+    assert arxiv_mod.download_source("2301.12345", str(tmp_path / "gz-html")) is None
+
+
+def _make_pdf_bytes(lines: list[str]) -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page()
+    y = 72
+    for ln in lines:
+        page.insert_text((72, y), ln)
+        y += 20
+    return doc.tobytes()
+
+
+def test_fetch_pdf_text_success(monkeypatch):
+    pdf = _make_pdf_bytes(["E = mc^2 + x"])
+    captured = {}
+
+    class FakeResp:
+        headers = {}
+
+        def __init__(self, data: bytes):
+            self._data = data
+            self._pos = 0
+
+        def read(self, n=-1):
+            if self._pos >= len(self._data):
+                return b""
+            chunk = self._data[self._pos : self._pos + n]
+            self._pos += len(chunk)
+            return chunk
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["timeout"] = timeout
+        return FakeResp(pdf)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    text = arxiv_mod.fetch_pdf_text("2301.12345")
+    assert text is not None and "E = mc^2" in text
+    assert "arxiv.org/pdf/2301.12345" in captured["url"]
+    assert captured["timeout"] == 15
+
+
+def test_fetch_pdf_text_scanned_returns_empty(monkeypatch):
+    import fitz
+
+    doc = fitz.open()
+    doc.new_page()  # blank, no text
+    pdf = doc.tobytes()
+
+    class FakeResp:
+        headers = {"Content-Type": "application/pdf"}
+
+        def __init__(self):
+            self._done = False
+
+        def read(self, n=-1):
+            if self._done:
+                return b""
+            self._done = True
+            return pdf
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: FakeResp())
+    text = arxiv_mod.fetch_pdf_text("2301.12345")
+    assert text is not None
+    assert text.strip() == ""
+
+
+def test_fetch_pdf_text_failure_returns_none(monkeypatch):
+    def boom(req, timeout=None):
+        raise urllib.error.URLError("down")
+
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    assert arxiv_mod.fetch_pdf_text("2301.12345") is None
