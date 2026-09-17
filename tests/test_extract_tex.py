@@ -102,3 +102,40 @@ def test_classify_plain_text_forms():
     }
     for latex, want in cases.items():
         assert eqextract.classify_equation(latex) == want, latex
+
+
+def test_gate_bare_func_name_glued():
+    """y = sinx: paren-less func call must pass the gate (frontend plots it)."""
+    eqs = eqextract.extract_equations_from_text("y = sinx\n")
+    assert any("y = sinx" in e["latex"] for e in eqs)
+
+
+def test_gate_glued_implicit_mult_with_operator():
+    eqs = eqextract.extract_equations_from_text("y = 2x+1\n")
+    assert any("y = 2x+1" in e["latex"] for e in eqs)
+
+
+def test_gate_pipe_pair_is_math():
+    eqs = eqextract.extract_equations_from_text("|x|\n")
+    assert any("|x|" in e["latex"] for e in eqs)
+
+
+def test_gate_subscript_is_math():
+    eqs = eqextract.extract_equations_from_text("x_i + 1\n")
+    assert any("x_i + 1" in e["latex"] for e in eqs)
+
+
+def test_gate_bare_greek_names_are_math():
+    eqs = eqextract.extract_equations_from_text("alpha + beta\n")
+    assert any("alpha + beta" in e["latex"] for e in eqs)
+
+
+def test_gate_percent_comment_only_rejected():
+    eqs = eqextract.extract_equations_from_text("% just a comment\n")
+    assert eqs == []
+
+
+def test_gate_classify_boundary_spot_checks():
+    """Gate accepts plottable bare forms; classify keeps its own contract."""
+    assert eqextract.classify_equation("y = sinx") == "function_def"
+    assert eqextract.classify_equation("y = 2x+1") == "function_def"
