@@ -36,7 +36,7 @@ export function Viewer3D({
     expression = defaultFreeParams(expandGluedX(normalizeInput(latex)));
   } catch {
     return (
-      <div role="img" aria-label={`3D plot of ${latex}`} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+      <div role="img" aria-label={`3D plot of ${latex}`} className="w-full rounded-lg border border-white/10 bg-black p-4">
         <span className={BADGE}>3D</span>
         <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
         <p className="mt-2 text-xs text-zinc-400">No 3D view for this type</p>
@@ -44,7 +44,7 @@ export function Viewer3D({
     );
   }
   return (
-    <div data-testid="viewer-3d" className="h-[280px] w-full md:h-[400px]" aria-label={`3D plot of ${latex}. Drag to rotate.`}>
+    <div data-testid="viewer-3d" className="h-[280px] w-full overflow-hidden rounded-lg border border-white/10 bg-black md:h-[400px]" aria-label={`3D plot of ${latex}. Drag to rotate.`}>
       <Sandbox3D gridVisible={showGrid} axesVisible={showAxes}>
         <GenericSurface
           expression={expression}
