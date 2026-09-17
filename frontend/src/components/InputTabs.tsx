@@ -82,8 +82,8 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
   }
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 md:p-6">
-      <div role="tablist" aria-label="Input source" className="mb-4 flex gap-1 rounded-md bg-zinc-900 p-1">
+    <div className="rounded-lg border border-white/10 bg-surface p-4 tabular-nums">
+      <div role="tablist" aria-label="Input source" className="mb-4 flex gap-1 rounded-full bg-black p-1">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -96,8 +96,8 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
               setInlineError(null);
             }}
             onKeyDown={onTabKeyDown}
-            className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
-              tab === t.id ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
+            className={`min-h-[44px] flex-1 rounded-full px-3 py-2 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
+              tab === t.id ? 'bg-white/10 text-white' : 'text-gray-300 hover:text-white'
             }`}
           >
             {t.label}
@@ -114,7 +114,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
             value={eqText}
             onChange={(e) => setEqText(e.target.value)}
             rows={3}
-            className="w-full resize-none rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            className="w-full resize-none rounded-lg border border-white/10 bg-black px-3 py-2 font-mono text-sm tabular-nums text-white placeholder-zinc-500 outline-none transition-colors duration-200 focus:border-white focus:ring-1 focus:ring-white"
           />
         </div>
       )}
@@ -128,7 +128,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
             placeholder="2401.00001 or https://arxiv.org/abs/2401.00001"
             value={arxiv}
             onChange={(e) => setArxiv(e.target.value)}
-            className="min-h-[44px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            className="min-h-[44px] w-full rounded-full border border-white/10 bg-black px-3 py-2 text-sm tabular-nums text-white placeholder-zinc-500 outline-none transition-colors duration-200 focus:border-white focus:ring-1 focus:ring-white"
           />
         </div>
       )}
@@ -141,15 +141,15 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
             accept=".pdf"
             aria-label="Upload PDF"
             onChange={onPdfChange}
-            className="min-h-[44px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none file:mr-3 file:rounded file:border-0 file:bg-zinc-700 file:px-3 file:py-2 file:text-sm file:text-zinc-100 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            className="min-h-[44px] w-full rounded-full border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none transition-colors duration-200 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:text-white focus:border-white focus:ring-1 focus:ring-white"
           />
           {pdf && (
-            <div className="mt-2 flex min-h-[44px] items-center justify-between gap-2 text-sm text-zinc-300">
+            <div className="mt-2 flex min-h-[44px] items-center justify-between gap-2 text-sm text-gray-300">
               <span className="truncate">{pdf.name}</span>
               <button
                 type="button"
                 onClick={() => setPdf(null)}
-                className="min-h-[44px] min-w-[44px] rounded-md border border-zinc-700 px-3 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className="min-h-[44px] min-w-[44px] rounded-full border border-white/20 px-3 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98]"
               >
                 Remove
               </button>
@@ -159,7 +159,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
       )}
 
       {inlineError && (
-        <p role="alert" className="mt-2 text-sm text-red-300">
+        <p role="alert" className="mt-2 rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-200">
           {inlineError}
         </p>
       )}
@@ -168,7 +168,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
         type="button"
         onClick={onSubmit}
         disabled={!valid || busy}
-        className="mt-4 min-h-[44px] w-full rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+        className="mt-4 min-h-[44px] w-full rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-all duration-200 hover:-translate-y-px hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
       >
         {busy ? (
           <span className="flex items-center justify-center gap-2">
@@ -190,7 +190,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
         type="button"
         onClick={defaultSample}
         disabled={busy}
-        className="mt-2 min-h-[44px] w-full rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+        className="mt-2 min-h-[44px] w-full rounded-full border border-white/20 px-4 py-2 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50"
       >
         Use sample
       </button>
