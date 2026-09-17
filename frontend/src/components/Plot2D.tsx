@@ -1,10 +1,14 @@
-import { captionFor, math, normalizeInput, normalizeWithMeta, stripLatex } from '../lib/mathParser';
+import { useState } from 'react';
+import { captionFor, freeSymbols, isKnownFunc, math, normalizeInput, normalizeWithMeta, parseExpr, stripLatex } from '../lib/mathParser';
 import type { Equation } from '../lib/extractApi';
 import { isFunctionLike, expandGluedX, plotSide } from '../lib/plotMeta';
+import { RegionPlot, hasIneqVar, isInequalityLatex, normalizeInequalityLatex, normalizedEcho } from './RegionPlot';
 
 interface Plot2DProps {
   equation: Equation;
   height?: number;
+  xRange?: [number, number];
+  yRange?: [number, number];
 }
 
 const N_POINTS = 200;
@@ -181,6 +185,7 @@ function renderMatrix(latex: string, label: string) {
   const totalRows = grid.length;
   const totalCols = grid[0].length;
   if (grid.some((row) => row.length !== totalCols)) return fail('Non-rectangular matrix');
+  if (totalRows * totalCols > 10000 || latex.length > 100 * 1024) return fail('Matrix too large to render');
   let rows = grid;
   let note: string | null = null;
   if (totalRows > 10 || totalCols > 10) {
@@ -248,12 +253,164 @@ function renderInfo(latex: string, type: string, label: string) {
   );
 }
 
-export function Plot2D({ equation, height = 320 }: Plot2DProps) {
+// Session-only memory for unsure A/B picks (cleared on reload, never persisted).
+const inspectChoices = new Map<string, string>();
+
+function splitEquality(latex: string): { lhs: string; rhs: string } | null {
+  const eq = latex.search(/(?<![=!<>])=(?![=<>])/);
+  if (eq < 0) return null;
+  return { lhs: latex.slice(0, eq), rhs: latex.slice(eq + 1) };
+}
+
+function inspectParts(latex: string): { vars: string[]; consts: string[]; shape: string } {
+  let src = latex;
+  try {
+    src = normalizeWithMeta(normalizeInequalityLatex(latex)).expr;
+  } catch {
+    src = latex;
+  }
+  let vars: string[];
+  try {
+    vars = freeSymbols(parseExpr(src));
+  } catch {
+    vars = [...new Set(src.match(/\b[A-Za-z][A-Za-z0-9]*\b/g) ?? [])].filter(
+      (w) => !isKnownFunc(w) && !isKnownFunc(w.toLowerCase()) && w !== 'e' && w !== 'pi' && w !== 'tau',
+    );
+  }
+  const consts = [...new Set(src.match(/-?\d+(\.\d+)?/g) ?? [])];
+  return { vars, consts, shape: latex.includes('=') ? 'equality' : 'expression' };
+}
+
+function InspectCard({ latex, label, height }: { latex: string; label: string; height: number }) {
+  const [override, setOverride] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [choice, setChoice] = useState<string | null>(() => inspectChoices.get(latex) ?? null);
+  const sides = splitEquality(latex);
+  const unsure = !!sides && hasIneqVar(sides.lhs, 'x') && hasIneqVar(sides.rhs, 'x');
+  const activeChoice = choice ?? inspectChoices.get(latex) ?? null;
+  const rawSide = activeChoice ?? plotSide(latex) ?? sides?.rhs.trim() ?? sides?.lhs.trim() ?? latex;
+  const guess = rawSide.startsWith('y=') ? rawSide : `y=${rawSide}`;
+  const badge =
+    sides && /^[A-Za-z][A-Za-z0-9]*$/.test(sides.lhs.trim()) ? 'DEFINITION' : 'IDENTITY';
+  const parts = inspectParts(latex);
+  const echo = normalizedEcho(latex);
+  let captions: string[] = [];
+  try {
+    captions = normalizeWithMeta(latex).assumptions.map(captionFor);
+  } catch {
+    captions = [];
+  }
+
+  if (override) {
+    let oc: string[] = [];
+    try {
+      oc = normalizeWithMeta(override).assumptions.map(captionFor);
+    } catch {
+      oc = [];
+    }
+    return renderFunction(override, label, height, oc);
+  }
+
+  const pick = (side: string) => {
+    inspectChoices.set(latex, side);
+    setChoice(side);
+  };
+
+  const editDraft = () => {
+    setDraft(guess);
+    try {
+      const el = document.getElementById('inputtabs-field') as
+        | HTMLTextAreaElement
+        | HTMLInputElement
+        | null;
+      if (el) el.value = guess;
+    } catch {
+      // local draft still shows; main input sync is best-effort only.
+    }
+  };
+
+  return (
+    <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+      <span className={BADGE}>{badge}</span>
+      <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
+      {echo && <p className="mt-1 font-mono text-xs text-zinc-500">normalized: {echo}</p>}
+      {unsure && sides && !activeChoice ? (
+        <div className="mt-3 rounded-md border border-zinc-800 p-3">
+          <p className="text-xs text-zinc-400">Two parses — pick one:</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => pick(sides.lhs.trim())}
+              className="min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 font-mono text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            >
+              Use A: {sides.lhs.trim()}
+            </button>
+            <button
+              type="button"
+              onClick={() => pick(sides.rhs.trim())}
+              className="min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 font-mono text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            >
+              Use B: {sides.rhs.trim()}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setOverride(guess)}
+            className="min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+          >
+            Plot one side
+          </button>
+          <button
+            type="button"
+            onClick={editDraft}
+            className="min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+          >
+            Edit into y=…
+          </button>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        <span className={BADGE}>vars: {parts.vars.join(', ') || '—'}</span>
+        <span className={BADGE}>consts: {parts.consts.join(', ') || '—'}</span>
+        <span className={BADGE}>shape: {parts.shape}</span>
+      </div>
+      <p className="mt-2 text-xs text-zinc-400">No 2D plot for this type</p>
+      {captions.map((c) => (
+        <p key={c} className="mt-1 text-xs text-zinc-400">{c}</p>
+      ))}
+      {draft && (
+        <div className="mt-3">
+          <label htmlFor="inspect-draft" className="mb-1 block text-xs text-zinc-400">
+            Draft (not evaluated)
+          </label>
+          <input
+            id="inspect-draft"
+            aria-label="Draft input"
+            value={draft}
+            readOnly
+            className="min-h-[44px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 outline-none"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Plot2D({
+  equation,
+  height = 320,
+  xRange = [-10, 10] as [number, number],
+  yRange = [-10, 10] as [number, number],
+}: Plot2DProps) {
   const latex = eqText(equation);
   const type = eqType(equation);
   const label = `${latex} (${type})`;
   if (type.toLowerCase().includes('matrix') || latex.includes('\\begin')) return renderMatrix(latex, label);
   if (isDerivativeForm(latex)) return renderInfo(latex, type, label);
+  if (isInequalityLatex(latex)) return <RegionPlot expr={latex} xRange={xRange} yRange={yRange} />;
   // ponytail: A's normalizeWithMeta throws on CARD (sum/integral); captions
   // aren't shown on the info card, so empty is the honest fallback.
   let captions: string[] = [];
@@ -266,5 +423,5 @@ export function Plot2D({ equation, height = 320 }: Plot2DProps) {
   if (isDistribution(type)) return renderDistribution(latex, type, label);
   const side = plotSide(latex);
   if (side !== null) return renderFunction(side, label, height, captions);
-  return renderInfo(latex, type, label);
+  return <InspectCard latex={latex} label={label} height={height} />;
 }

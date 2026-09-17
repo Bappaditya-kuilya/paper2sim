@@ -262,3 +262,208 @@ describe('N1 + captions + fallback reasons (plan-math §3-§4)', () => {
     expect(screen.getByText(/empty expression|no finite points on x∈\[-10,10\]/)).toBeDefined();
   });
 });
+
+describe('F4 PlotErrorBoundary', () => {
+  test('boundary catches throwing child showing badge+raw+Retry', async () => {
+    const { PlotErrorBoundary } = await import('../App');
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const Thrower = () => {
+        throw new Error('boom');
+      };
+      render(
+        <PlotErrorBoundary paper="T" index={0} type="function" latex="y=x">
+          <Thrower />
+        </PlotErrorBoundary>,
+      );
+      expect(screen.getByText('Plot failed')).toBeDefined();
+      expect(screen.getByText('y=x')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Retry plot' })).toBeDefined();
+      expect(errSpy).toHaveBeenCalled();
+      const logged = JSON.stringify(errSpy.mock.calls);
+      expect(logged).toMatch('T');
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  test('Retry remounts same selection', async () => {
+    const { PlotErrorBoundary } = await import('../App');
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      let shouldThrow = true;
+      const Flaky = () => {
+        if (shouldThrow) throw new Error('first boom');
+        return <div>recovered</div>;
+      };
+      render(
+        <PlotErrorBoundary paper="T" index={1} type="function" latex="y=x+1">
+          <Flaky />
+        </PlotErrorBoundary>,
+      );
+      expect(screen.getByText('Plot failed')).toBeDefined();
+      shouldThrow = false;
+      fireEvent.click(screen.getByRole('button', { name: 'Retry plot' }));
+      expect(screen.getByText('recovered')).toBeDefined();
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  test('2nd consecutive failure disables Retry in place', async () => {
+    const { PlotErrorBoundary } = await import('../App');
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const AlwaysThrow = () => {
+        throw new Error('always');
+      };
+      render(
+        <PlotErrorBoundary paper="T" index={2} type="function" latex="y=x+2">
+          <AlwaysThrow />
+        </PlotErrorBoundary>,
+      );
+      const btn1 = screen.getByRole('button', { name: 'Retry plot' }) as HTMLButtonElement;
+      expect(btn1.disabled).toBe(false);
+      fireEvent.click(btn1);
+      const btn2 = screen.getByRole('button', { name: 'Retry plot' }) as HTMLButtonElement;
+      expect(btn2.disabled).toBe(true);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+});
+
+describe('F3 caps', () => {
+  test('EqList renders 200 of 250 without the 201st', async () => {
+    const { EqList } = await import('../components/EqList');
+    const eqs = Array.from({ length: 250 }, (_, i) => ({ latex: `y = x + ${i}`, type: 'function' }));
+    const { container } = render(<EqList equations={eqs} selected={0} onSelect={() => {}} loading={false} />);
+    expect(container.querySelectorAll('li').length).toBe(200);
+    expect(screen.queryByText('y = x + 200')).toBeNull();
+    expect(screen.getByText('y = x + 0')).toBeDefined();
+  });
+
+  test('list header shows backend warning verbatim', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [{ latex: 'y=x', type: 'function' }],
+      warning: 'Showing first 200 of 250',
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    await screen.findByText('Showing first 200 of 250');
+  });
+
+  test('matrix bail card on huge grid', () => {
+    const cols = Array.from({ length: 101 }, () => '1').join(' & ');
+    const body = Array.from({ length: 101 }, () => cols).join(' \\\\ ');
+    const latex = `\\begin{bmatrix}${body}\\end{bmatrix}`;
+    const { container } = render(<Plot2D equation={{ latex, type: 'matrix' }} />);
+    expect(container.querySelector('table')).toBeNull();
+    expect(screen.getByText('Matrix too large to render')).toBeDefined();
+  });
+});
+
+describe('F5 Viewer3D CARD', () => {
+  test('CARD input renders info card instead of throwing', () => {
+    const cardLatex = '\\sum_{i=1}^{n} x';
+    render(
+      <Viewer3D
+        latex={cardLatex}
+        xRange={[-10, 10]}
+        yRange={[-10, 10]}
+        resolution={32}
+        showGrid
+        showAxes
+        wireframe={false}
+      />,
+    );
+    expect(screen.getByText('No 3D view for this type')).toBeDefined();
+    expect(screen.getByText(cardLatex)).toBeDefined();
+  });
+});
+
+describe('zero-state abstract fallback', () => {
+  test('empty result with abstract warning shows no-full-text subline', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [],
+      warning: 'full text unavailable, using abstract only',
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    await screen.findByText('No equations found');
+    expect(screen.getByText('No full text for this paper — its abstract had no plottable math.')).toBeDefined();
+  });
+
+  test('empty result with other cause keeps default fallback', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [],
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    await screen.findByText('No equations found');
+    expect(screen.getByText('No extractable math detected in that input.')).toBeDefined();
+  });
+});
+
+describe('R1 RegionPlot (plan-universal v2 §1 R1)', () => {
+  test('region renders canvas for x²+y²≤4 + mandatory caption', () => {
+    const { container } = render(<Plot2D equation={{ latex: 'x^2+y^2<=4', type: 'equation' }} />);
+    expect(container.querySelector('canvas')).not.toBeNull();
+    expect(screen.getByText('shaded = true over visible domain')).toBeDefined();
+  });
+
+  test('degenerate empty cards with exact string', () => {
+    const { container } = render(<Plot2D equation={{ latex: 'x^2+y^2<=-1', type: 'equation' }} />);
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(screen.getByText('no true cells on x∈[-10,10] y∈[-10,10]')).toBeDefined();
+  });
+
+  test('degenerate full cards with exact string', () => {
+    const { container } = render(<Plot2D equation={{ latex: 'x^2+y^2>=-1', type: 'equation' }} />);
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(screen.getByText('true everywhere on visible domain — widen range to see boundary')).toBeDefined();
+  });
+});
+
+describe('R2 inspect tiers (plan-universal v2 §1 R2)', () => {
+  test('DEFINITION badge + Plot one side sets evaluator', () => {
+    const { container } = render(<Plot2D equation={{ latex: 'E = 5', type: 'unknown' }} />);
+    expect(screen.getByText('DEFINITION')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Plot one side' }));
+    expect(container.querySelector('svg path')).not.toBeNull();
+  });
+
+  test('Edit into y=… copies draft without eval', () => {
+    const { container } = render(<Plot2D equation={{ latex: 'E = 5', type: 'unknown' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit into y=…' }));
+    const draft = screen.getByLabelText('Draft input') as HTMLInputElement;
+    expect(draft.value).toBe('y=5');
+    expect(container.querySelector('svg path')).toBeNull();
+  });
+});
+
+describe('R3 jump (plan-universal v2 §1 R3)', () => {
+  test('recenter button recenters domain on C', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [{ latex: '(x-100)^2 + y^2 <= 4', type: 'equation' }],
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: '(x-100)^2 + y^2 <= 4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    const btn = await screen.findByRole('button', { name: 'Recenter on x=100' });
+    expect(btn).toBeDefined();
+    fireEvent.click(btn);
+    expect(await screen.findByText(/x∈\[90,110\]/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Recenter on x=100' })).toBeNull();
+  });
+});
+
+describe('echo contract (plan-universal v2 §2)', () => {
+  test('silent on clean region input', () => {
+    render(<Plot2D equation={{ latex: 'x^2+y^2<=4', type: 'equation' }} />);
+    expect(screen.queryByText(/normalized:/)).toBeNull();
+  });
+});
