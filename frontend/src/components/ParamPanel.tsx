@@ -12,9 +12,9 @@ const RES_MIN = 16;
 const RES_MAX = 96;
 
 const INPUT =
-  'min-h-[44px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 outline-none focus:border-zinc-500';
+  'min-h-[44px] w-full rounded-full border border-white/10 bg-[#111111] px-3 py-2 font-mono text-sm tabular-nums text-white outline-none focus:border-white focus-visible:ring-2 focus-visible:ring-white';
 const INPUT_ERROR = 'border-red-500';
-const LABEL = 'mb-1 block text-xs text-zinc-400';
+const LABEL = 'mb-1 block text-xs text-[#D1D5DB]';
 
 // Contract: ParamPanel only emits valid patches via onChange — the parent keeps
 // the last-valid params and never unmounts the canvas. Invalid input shows an
@@ -88,7 +88,7 @@ export function ParamPanel({
   const rangeClass = (axis: 'x' | 'y') => `${INPUT} ${errorAxis === axis ? INPUT_ERROR : ''}`;
 
   return (
-    <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div className="mt-3 rounded-lg border border-white/10 bg-black p-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="param-xmin" className={LABEL}>
@@ -168,15 +168,15 @@ export function ParamPanel({
         </div>
       </div>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-300">
+        <p role="alert" className="mt-2 text-sm text-[#EF4444]">
           {error}
         </p>
       )}
-      {!error && note && <p className="mt-2 text-xs text-zinc-400">{note}</p>}
+      {!error && note && <p className="mt-2 text-xs text-[#D1D5DB]">{note}</p>}
 
       <div className="mt-4">
         <div className="mb-1 flex items-center justify-between gap-3">
-          <label htmlFor="param-resolution" className="text-xs text-zinc-400">
+          <label htmlFor="param-resolution" className="text-xs text-[#D1D5DB]">
             Resolution
           </label>
           <input
@@ -186,7 +186,7 @@ export function ParamPanel({
             max={RES_MAX}
             value={resolution}
             onChange={(e) => commitResolution(e.target.value)}
-            className="min-h-[44px] w-20 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-2 text-right font-mono text-sm text-zinc-100 outline-none focus:border-zinc-500"
+            className="min-h-[44px] w-20 rounded-full border border-white/10 bg-[#111111] px-2 py-2 text-right font-mono text-sm tabular-nums text-white outline-none focus:border-white focus-visible:ring-2 focus-visible:ring-white"
           />
         </div>
         <input
@@ -197,35 +197,35 @@ export function ParamPanel({
           step={8}
           value={resolution}
           onChange={(e) => commitResolution(e.target.value)}
-          className="min-h-[44px] w-full accent-emerald-400"
+          className="min-h-[44px] w-full accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
-        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-zinc-300">
+        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-[#D1D5DB]">
           <input
             type="checkbox"
             checked={showGrid}
             onChange={(e) => onChange({ showGrid: e.target.checked })}
-            className="h-5 w-5 accent-emerald-400"
+            className="h-5 w-5 accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           />
           Grid
         </label>
-        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-zinc-300">
+        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-[#D1D5DB]">
           <input
             type="checkbox"
             checked={showAxes}
             onChange={(e) => onChange({ showAxes: e.target.checked })}
-            className="h-5 w-5 accent-emerald-400"
+            className="h-5 w-5 accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           />
           Axes
         </label>
-        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-zinc-300">
+        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-[#D1D5DB]">
           <input
             type="checkbox"
             checked={wireframe}
             onChange={(e) => onChange({ wireframe: e.target.checked })}
-            className="h-5 w-5 accent-emerald-400"
+            className="h-5 w-5 accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           />
           Wireframe
         </label>
