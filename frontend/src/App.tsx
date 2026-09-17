@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { checkBackend, type Equation, type ExtractResponse } from './lib/extractApi';
 import { hintFor, showDimensionToggle } from './lib/plotMeta';
 import { InputTabs } from './components/InputTabs';
 import { EqList } from './components/EqList';
 import { Plot2D } from './components/Plot2D';
+import { centerRangeOn, findJumpTarget, isInequalityLatex } from './components/RegionPlot';
 import { Viewer3D } from './components/Viewer3D';
 import { ParamPanel } from './components/ParamPanel';
 import {
@@ -35,6 +36,29 @@ function sampleEquations(): Equation[] {
 
 function focusTabField() {
   document.getElementById('inputtabs-field')?.focus();
+}
+
+type PlotErrorBoundaryProps = { paper: string; index: number; type: string; latex: string; children: ReactNode };
+type PlotErrorBoundaryState = { failed: boolean; fails: number };
+
+export class PlotErrorBoundary extends Component<PlotErrorBoundaryProps, PlotErrorBoundaryState> {
+  state: PlotErrorBoundaryState = { failed: false, fails: 0 };
+  static getDerivedStateFromError(): Partial<PlotErrorBoundaryState> { return { failed: true }; }
+  componentDidCatch(): void {
+    this.setState((s) => ({ fails: s.fails + 1 }));
+    console.error({ paper: this.props.paper, index: this.props.index, type: this.props.type });
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    const disabled = this.state.fails >= 2;
+    return (
+      <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+        <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">Plot failed</span>
+        <p className="mt-2 break-words font-mono text-sm text-zinc-100">{this.props.latex}</p>
+        <button type="button" disabled={disabled} onClick={() => this.setState({ failed: false })} className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50">Retry plot</button>
+      </div>
+    );
+  }
 }
 
 export default function App() {
@@ -117,6 +141,29 @@ export default function App() {
   const selectedEq = equations[selected] ?? equations[0] ?? null;
   const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${equations.length} equations${title ? ` — ${title}` : ''}` : ''));
   const showZero = attempted && !busy && equations.length === 0;
+  const selectedLatex = selectedEq ? eqText(selectedEq) : '';
+  const jumpTarget = selectedEq && !busy && isInequalityLatex(selectedLatex)
+    ? findJumpTarget(selectedLatex, params.xRange, params.yRange)
+    : null;
+  const jumpLabel = jumpTarget
+    ? jumpTarget.x !== undefined && jumpTarget.y !== undefined
+      ? `Recenter on (${jumpTarget.x}, ${jumpTarget.y})`
+      : jumpTarget.x !== undefined
+        ? `Recenter on x=${jumpTarget.x}`
+        : `Recenter on y=${jumpTarget.y}`
+    : null;
+  const hasToggle = !!selectedEq
+    && showDimensionToggle(eqType(selectedEq), selectedLatex)
+    && !/d[A-Za-z]?\s*\/\s*d\s*x|\\frac\s*\{\s*d/.test(selectedLatex);
+  const regionVisible = !!selectedEq && !busy && (!hasToggle || viewMode === '2d');
+
+  const handleJump = useCallback(() => {
+    setParams((p) => ({
+      ...p,
+      xRange: jumpTarget?.x !== undefined ? centerRangeOn(p.xRange, jumpTarget.x) : p.xRange,
+      yRange: jumpTarget?.y !== undefined ? centerRangeOn(p.yRange, jumpTarget.y) : p.yRange,
+    }));
+  }, [jumpTarget]);
 
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100">
@@ -156,7 +203,7 @@ export default function App() {
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-6 text-center">
               <p className="text-sm font-medium text-zinc-200">No equations found</p>
               <p className="mx-auto mt-1 max-w-md text-xs text-zinc-400">
-                {cause ?? 'No extractable math detected in that input.'}
+                {cause?.includes('full text unavailable') ? 'No full text for this paper — its abstract had no plottable math.' : (cause ?? 'No extractable math detected in that input.')}
               </p>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
                 <button
@@ -179,11 +226,12 @@ export default function App() {
             <>
               {equations.length > 0 && (
                 <p className="mb-3 text-sm text-zinc-400">
-                  {equations.length} equations{title ? ` — ${title}` : ''}
+                  {cause ?? `${equations.length} equations${title ? ` — ${title}` : ''}`}
                 </p>
               )}
               <EqList equations={equations} selected={selected} onSelect={handleSelect} loading={busy} />
               {selectedEq && !busy && (
+                <PlotErrorBoundary key={selected} paper={title} index={selected} type={eqType(selectedEq)} latex={eqText(selectedEq)}>
                 <section aria-label="Selected equation" className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">
@@ -230,7 +278,7 @@ export default function App() {
                           </label>
                         </div>
                         {viewMode === '2d' ? (
-                          <Plot2D equation={selectedEq} />
+                          <Plot2D equation={selectedEq} xRange={params.xRange} yRange={params.yRange} />
                         ) : (
                           <>
                             <Viewer3D
@@ -247,7 +295,16 @@ export default function App() {
                         )}
                       </>
                     ) : (
-                      <Plot2D equation={selectedEq} />
+                      <Plot2D equation={selectedEq} xRange={params.xRange} yRange={params.yRange} />
+                    )}
+                    {regionVisible && jumpTarget && jumpLabel && (
+                      <button
+                        type="button"
+                        onClick={handleJump}
+                        className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                      >
+                        {jumpLabel}
+                      </button>
                     )}
                     <p className="mt-2 text-xs text-zinc-400">{hintFor(eqType(selectedEq))}</p>
                   </div>
@@ -259,6 +316,7 @@ export default function App() {
                     {copied ? 'Copied' : 'Copy'}
                   </button>
                 </section>
+                </PlotErrorBoundary>
               )}
             </>
           )}

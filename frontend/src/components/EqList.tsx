@@ -43,7 +43,7 @@ export function EqList({ equations, selected, onSelect, loading }: EqListProps) 
 
   return (
     <ul className="grid gap-3">
-      {equations.map((eq, i) => {
+      {equations.slice(0, 200).map((eq, i) => {
         const text = eqText(eq);
         const type = eqType(eq);
         const active = i === selected;
