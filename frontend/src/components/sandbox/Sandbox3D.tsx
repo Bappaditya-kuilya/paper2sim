@@ -20,10 +20,10 @@ function Scene({ children, gridVisible = true, axesVisible = true }: Omit<Sandbo
           args={[20, 20]}
           cellSize={1}
           cellThickness={0.5}
-          cellColor="#444"
+          cellColor="#27272a"
           sectionSize={5}
           sectionThickness={1}
-          sectionColor="#888"
+          sectionColor="#52525b"
           fadeDistance={25}
           fadeStrength={1}
           position={[0, -0.01, 0]}
