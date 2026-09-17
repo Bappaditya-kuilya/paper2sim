@@ -29,10 +29,10 @@ export function ParamSliders({ row, onChange }: ParamSlidersProps) {
         return (
           <div key={sym}>
             <div className="mb-1 flex items-center justify-between gap-3">
-              <label htmlFor={id} className="font-mono text-xs text-zinc-400">
+              <label htmlFor={id} className="font-mono text-xs text-[#D1D5DB]">
                 {sym}
               </label>
-              <output htmlFor={id} className="font-mono text-xs text-zinc-200">
+              <output htmlFor={id} className="font-mono text-xs tabular-nums text-white">
                 {value}
               </output>
             </div>
@@ -47,7 +47,7 @@ export function ParamSliders({ row, onChange }: ParamSlidersProps) {
                 const v = Number(e.target.value);
                 onChange({ ...row.params, [sym]: { value: v, min, max, step } });
               }}
-              className="min-h-[44px] w-full accent-emerald-400"
+              className="min-h-[44px] w-full accent-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             />
           </div>
         );
