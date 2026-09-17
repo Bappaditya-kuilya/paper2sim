@@ -52,13 +52,26 @@ export function plotSide(latex: string): string | null {
   return null;
 }
 // Free symbols default to 1 (mirrors Plot2D's DEFAULT_SCOPE, minus x/y which are
-// 3D axes here). Word boundaries keep function names (sin, sqrt) and constants
-// (e, pi) untouched. ponytail: regex, not mathjs parse — parse isn't in the
-// tree-shaken bundle and this covers the blessed set exactly.
-const FREE_PARAMS = new Set(['k', 'a', 'b', 'c', 'd', 'm', 'n', 'p', 'q', 't']);
+// 3D axes here, minus e/pi/tau which are mathjs constants). Word boundaries keep
+// function names (sin, sqrt, log10) untouched. ponytail: regex, not mathjs parse —
+// parse isn't in the tree-shaken bundle and this covers the blessed set exactly.
+// Textual defaults only; multi-letter typos still throw (honest badge, never flat line).
+const FREE_SINGLE = new Set(
+  [...'abcdefghijklmnopqrstuvwxyz'].filter((c) => c !== 'x' && c !== 'y' && c !== 'e'),
+);
+// ponytail: pi/tau excluded (mathjs constants, not params).
+const FREE_GREEK = new Set([
+  'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
+  'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'rho',
+  'sigma', 'upsilon', 'phi', 'chi', 'psi', 'omega',
+]);
 
 export function defaultFreeParams(expr: string): string {
-  return expr.replace(/\b([kabcdmnpqt])\b/g, (name) => (FREE_PARAMS.has(name) ? '(1)' : name));
+  const singles = expr.replace(/\b([a-z])\b/g, (name) => (FREE_SINGLE.has(name) ? '(1)' : name));
+  return singles.replace(
+    /\b(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|rho|sigma|upsilon|phi|chi|psi|omega)\b/g,
+    (name) => (FREE_GREEK.has(name) ? '(1)' : name),
+  );
 }
 
 export function showDimensionToggle(type: string, latex: string): boolean {
