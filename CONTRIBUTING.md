@@ -28,7 +28,7 @@ npm install
 ## Code Style
 
 - **Python**: Follow PEP 8, use ruff for formatting
-- **TypeScript**: Follow ESLint rules, use Prettier
+- **TypeScript**: Follow the repo's oxlint rules (`cd frontend && npm run lint`)
 - **Commit Messages**: Use conventional commits (`feat:`, `fix:`, `test:`, etc.)
 
 ## Testing
