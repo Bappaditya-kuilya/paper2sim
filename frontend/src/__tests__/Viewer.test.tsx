@@ -467,11 +467,12 @@ describe('multi-overlay shell (new)', () => {
         { latex: 'y = x', type: 'function' },
       ],
     });
-    const { container } = render(<App />);
+    render(<App />);
     fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=sin(x)' } });
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
     await screen.findAllByLabelText('Equation');
-    expect(container.querySelectorAll('svg path').length).toBe(3);
+    const plots = () => screen.getByRole('img', { name: /\d+ plots?/ });
+    expect(plots().querySelectorAll('path').length).toBe(3);
   });
 
   test('eye toggle hides path', async () => {
@@ -482,41 +483,44 @@ describe('multi-overlay shell (new)', () => {
         { latex: 'y = x', type: 'function' },
       ],
     });
-    const { container } = render(<App />);
+    render(<App />);
     fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=sin(x)' } });
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
     await screen.findAllByLabelText('Equation');
-    expect(container.querySelectorAll('svg path').length).toBe(3);
+    const plots = () => screen.getByRole('img', { name: /\d+ plots?/ });
+    expect(plots().querySelectorAll('path').length).toBe(3);
     fireEvent.click(screen.getByRole('button', { name: 'Hide y = sin(x)' }));
-    expect(container.querySelectorAll('svg path').length).toBe(2);
+    expect(plots().querySelectorAll('path').length).toBe(2);
   });
 
   test('edit re-plots', async () => {
     vi.mocked(extractText).mockResolvedValue({
       equations: [{ latex: 'y = sin(x)', type: 'trigonometric' }],
     });
-    const { container } = render(<App />);
+    render(<App />);
     fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=sin(x)' } });
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
     await screen.findAllByLabelText('Equation');
-    const before = container.querySelector('svg path')?.getAttribute('d');
+    const plot = () => screen.getByRole('img', { name: /\d+ plots?/ });
+    const before = plot().querySelector('path')?.getAttribute('d');
     const input = screen.getByDisplayValue('y = sin(x)') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'y = cos(x)' } });
     fireEvent.blur(input);
     await screen.findByDisplayValue('y = cos(x)');
-    const after = container.querySelector('svg path')?.getAttribute('d');
+    const after = plot().querySelector('path')?.getAttribute('d');
     expect(before).not.toBeNull();
     expect(after).not.toBeNull();
     expect(after).not.toBe(before);
   });
 
   test('slider drag updates path', async () => {
-    const { container } = render(<App />);
+    render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
     const slider = await screen.findByLabelText('k') as HTMLInputElement;
-    const before = container.querySelector('svg path')?.getAttribute('d');
+    const plot = () => screen.getByRole('img', { name: /\d+ plots?/ });
+    const before = plot().querySelector('path')?.getAttribute('d');
     fireEvent.change(slider, { target: { value: '2' } });
-    const after = container.querySelector('svg path')?.getAttribute('d');
+    const after = plot().querySelector('path')?.getAttribute('d');
     expect(before).not.toBeNull();
     expect(after).not.toBeNull();
     expect(after).not.toBe(before);
