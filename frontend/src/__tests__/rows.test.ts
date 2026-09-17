@@ -3,8 +3,8 @@ import { PALETTE, newRow, toggleRow, duplicateRow } from '../lib/expressionRows'
 import { DEFAULT_VIEWPORT, panViewport, zoomViewport } from '../lib/viewport';
 
 describe('PALETTE', () => {
-  test('has 6 hex colors', () => {
-    expect(PALETTE).toHaveLength(6);
+  test('has 4 hex colors', () => {
+    expect(PALETTE).toHaveLength(4);
     for (const c of PALETTE) expect(c).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 });

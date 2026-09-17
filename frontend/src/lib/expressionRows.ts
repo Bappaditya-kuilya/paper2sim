@@ -13,7 +13,11 @@ export interface Row {
   params: Record<string, RowParam>;
 }
 
-export const PALETTE: string[] = ['#10b981', '#3b82f6', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'];
+export const PALETTE: string[] = ['#FFFFFF', '#D1D5DB', '#9CA3AF', '#6B7280'];
+
+export const RAMP: string[] = PALETTE;
+
+export const DASH_CYCLE: string[] = ['', '6 3', '2 3', '8 3 2 3'];
 
 export function newRow(latex: string, color: string): Row {
   return { id: crypto.randomUUID(), latex, color, visible: true, params: {} };
