@@ -45,8 +45,8 @@ Empty success is `200 {equations: []}`; failures are JSON (`400` bad id, `502` a
 
 | Variable | Where | Default | Required in production |
 |---|---|---|---|
-| `VITE_API_URL` | Frontend build | `''` (same-origin) | **Yes** — baked at build time; set to the Render URL in Vercel, then redeploy |
-| `CORS_ORIGINS` | Backend | `http://localhost:5173` | **Yes** — comma-separated list containing the Vercel origin, set on Render |
+| `VITE_API_URL` | Frontend build | `''` (same-origin) | No — same-origin by default via Vercel rewrites (nothing required); set only to point at a non-proxied backend (local dev, e.g. `http://localhost:8000`) |
+| `CORS_ORIGINS` | Backend | `http://localhost:5173` | No — only for direct cross-origin API users; same-origin prod traffic via rewrites needs no CORS entry |
 | `DATA_DIR` | Backend | `./data` | No (SQLite arXiv cache lives here) |
 | `CACHE_DB` | Backend | `$DATA_DIR/cache.db` | No (overrides cache path; tests point it at tmp) |
 | `VITE_DEV_HOSTS` | Frontend dev only | — | No (comma-separated extra `vite dev` hosts; never affects `vite build`) |
@@ -61,6 +61,8 @@ React (Vercel) ──HTTPS + CORS──▶ FastAPI (Render, sync extract)
                                               (math parser + SVG/Canvas 2D
                                                + three.js 3D run 100% in browser)
 ```
+
+Prod frontend calls the API same-origin via Vercel rewrites (`/api/*`, `/health` → Render); browsers never issue cross-origin fetches.
 
 ## Develop
 
