@@ -1,4 +1,4 @@
-import { math, normalizeInput, stripLatex } from '../lib/mathParser';
+import { captionFor, math, normalizeInput, normalizeWithMeta, stripLatex } from '../lib/mathParser';
 import type { Equation } from '../lib/extractApi';
 import { isFunctionLike, expandGluedX, plotSide } from '../lib/plotMeta';
 
@@ -20,6 +20,12 @@ const BADGE =
 
 // ponytail: free params (k, a, b, ...) default to 1; full param UI lands with the 3D panel.
 const DEFAULT_SCOPE = { k: 1, a: 1, b: 1, c: 1, d: 1, m: 1, n: 1, p: 1, q: 1, t: 1, y: 1 };
+
+// Captions come from mathParser.normalizeWithMeta/captionFor (agent A canonical).
+
+function isDerivativeForm(latex: string): boolean {
+  return /d[A-Za-z]?\s*\/\s*d\s*x|\\frac\s*\{\s*d/.test(latex);
+}
 
 function eqText(eq: Equation): string {
   const r = eq as unknown as Record<string, unknown>;
@@ -61,10 +67,12 @@ function parseMatrixGrid(latex: string): string[][] | null {
   return rows.map((r) => r.split('&').map((c) => c.trim()));
 }
 
-function renderFunction(latex: string, label: string, height: number) {
+function renderFunction(latex: string, label: string, height: number, captions: string[]) {
   try {
     const h = height > 0 ? height : 320;
-    const expr = expandGluedX(normalizeInput(latex));
+    const raw = expandGluedX(normalizeInput(latex));
+    // Fallback subscript drop (Agent A canonical lands in mathParser): X_(...)→X.
+    const expr = raw.replace(/_\([^)]*\)/g, '').replace(/_[A-Za-z0-9]/g, '');
     if (!expr) throw new Error('empty expression');
     const code = math.compile(expr);
     const pts: Array<[number, number]> = [];
@@ -141,13 +149,21 @@ function renderFunction(latex: string, label: string, height: number) {
           <text x={VIEW_W - PAD_R} y={h - 6} textAnchor="end" fontSize={11} fill="#a1a1aa">x</text>
           <text x={12} y={PAD_T + 4} textAnchor="start" fontSize={11} fill="#a1a1aa">y</text>
         </svg>
+        {captions.map((c) => (
+          <p key={c} className="mt-1 text-xs text-zinc-400">{c}</p>
+        ))}
       </div>
     );
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '';
+    const reason = msg.includes('empty expression')
+      ? 'empty expression'
+      : 'no finite points on x∈[-10,10]';
     return (
       <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
         <span className={BADGE}>not plottable</span>
         <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
+        <p className="mt-2 text-xs text-zinc-400">{reason}</p>
       </div>
     );
   }
@@ -236,10 +252,19 @@ export function Plot2D({ equation, height = 320 }: Plot2DProps) {
   const latex = eqText(equation);
   const type = eqType(equation);
   const label = `${latex} (${type})`;
-  if (isFunctionLike(type)) return renderFunction(latex, label, height);
   if (type.toLowerCase().includes('matrix') || latex.includes('\\begin')) return renderMatrix(latex, label);
+  if (isDerivativeForm(latex)) return renderInfo(latex, type, label);
+  // ponytail: A's normalizeWithMeta throws on CARD (sum/integral); captions
+  // aren't shown on the info card, so empty is the honest fallback.
+  let captions: string[] = [];
+  try {
+    captions = normalizeWithMeta(latex).assumptions.map(captionFor);
+  } catch {
+    captions = [];
+  }
+  if (isFunctionLike(type)) return renderFunction(latex, label, height, captions);
   if (isDistribution(type)) return renderDistribution(latex, type, label);
   const side = plotSide(latex);
-  if (side !== null) return renderFunction(side, label, height);
+  if (side !== null) return renderFunction(side, label, height, captions);
   return renderInfo(latex, type, label);
 }

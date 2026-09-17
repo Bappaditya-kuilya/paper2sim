@@ -238,3 +238,27 @@ describe('showDimensionToggle gate', () => {
     expect(container.querySelector('[aria-label="3D capable"]')).toBeNull();
   });
 });
+
+describe('N1 + captions + fallback reasons (plan-math §3-§4)', () => {
+  test('subscript-dropped input shows caption', () => {
+    render(<Plot2D equation={{ latex: 'y = x_{1} + x', type: 'function' }} />);
+    expect(screen.getByText('Showing x — subscript dropped for 2D.')).toBeDefined();
+  });
+
+  test('clean y=sin(x) shows no caption', () => {
+    render(<Plot2D equation={{ latex: 'y=sin(x)', type: 'trigonometric' }} />);
+    expect(screen.queryByText(/Showing /)).toBeNull();
+  });
+
+  test('d/dx without derivativeDependencies cards, never plots', () => {
+    const { container } = render(<Plot2D equation={{ latex: 'd/dx x^2', type: 'calculus' }} />);
+    expect(container.querySelector('svg path')).toBeNull();
+    expect(screen.getByText('No 2D plot for this type')).toBeDefined();
+    expect(screen.getByText('d/dx x^2')).toBeDefined();
+  });
+
+  test('garbage shows stage reason line', () => {
+    render(<Plot2D equation={{ latex: 'sin(((', type: 'trigonometric' }} />);
+    expect(screen.getByText(/empty expression|no finite points on x∈\[-10,10\]/)).toBeDefined();
+  });
+});
