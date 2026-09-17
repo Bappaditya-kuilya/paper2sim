@@ -20,7 +20,9 @@ const PAD_R = 12;
 const PAD_T = 12;
 const PAD_B = 32;
 const BADGE =
-  'inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300';
+  'inline-flex items-center rounded-full bg-[#374151] px-2 py-0.5 text-xs font-medium text-white';
+const BADGE_FAILED =
+  'inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-[#EF4444] ring-1 ring-inset ring-red-500/20';
 
 // ponytail: free params (k, a, b, ...) default to 1; full param UI lands with the 3D panel.
 export const DEFAULT_SCOPE: Record<string, number> = { k: 1, a: 1, b: 1, c: 1, d: 1, m: 1, n: 1, p: 1, q: 1, t: 1, y: 1 };
@@ -153,7 +155,7 @@ function renderFunction(latex: string, label: string, height: number, captions: 
           ))}
           <line x1={PAD_L} y1={yZero} x2={VIEW_W - PAD_R} y2={yZero} stroke="#a1a1aa" strokeWidth={1} />
           <line x1={xZero} y1={PAD_T} x2={xZero} y2={h - PAD_B} stroke="#a1a1aa" strokeWidth={1} />
-          <path d={d.trim()} fill="none" stroke="#34d399" strokeWidth={2} />
+          <path d={d.trim()} fill="none" stroke="#FFFFFF" strokeWidth={2} />
           {xTicks.map((t) => (
             <text key={`tx${t}`} x={xToPx(t)} y={h - PAD_B + 16} textAnchor="middle" fontSize={10} fill="#a1a1aa">
               {fmt(t)}
@@ -178,8 +180,8 @@ function renderFunction(latex: string, label: string, height: number, captions: 
       ? 'empty expression'
       : 'no finite points on x∈[-10,10]';
     return (
-      <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-        <span className={BADGE}>not plottable</span>
+      <div role="img" aria-label={label} className="w-full rounded-lg border border-white/10 bg-black p-4">
+        <span className={BADGE_FAILED}>not plottable</span>
         <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
         <p className="mt-2 text-xs text-zinc-400">{reason}</p>
       </div>
@@ -189,7 +191,7 @@ function renderFunction(latex: string, label: string, height: number, captions: 
 
 function renderMatrix(latex: string, label: string) {
   const fail = (msg: string) => (
-    <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div role="img" aria-label={label} className="w-full rounded-lg border border-white/10 bg-black p-4">
       <p className="text-sm text-zinc-300">{msg}</p>
       <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
     </div>
@@ -218,7 +220,7 @@ function renderMatrix(latex: string, label: string) {
   const span = hi - lo || 1;
   const showValues = rows.length <= 6 && rows[0].length <= 6;
   const bg = (v: number): string =>
-    Number.isFinite(v) ? `rgba(52, 211, 153, ${(0.12 + (0.75 * (v - lo)) / span).toFixed(2)})` : 'transparent';
+    Number.isFinite(v) ? `rgba(255, 255, 255, ${(0.12 + (0.75 * (v - lo)) / span).toFixed(2)})` : 'transparent';
   return (
     <div role="img" aria-label={label} className="w-full">
       {note && <p className="mb-2 text-xs text-zinc-400">{note}</p>}
@@ -249,7 +251,7 @@ function renderMatrix(latex: string, label: string) {
 function renderDistribution(latex: string, type: string, label: string) {
   const hasNumbers = /\d/.test(latex);
   return (
-    <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div role="img" aria-label={label} className="w-full rounded-lg border border-white/10 bg-black p-4">
       <span className={BADGE}>{type}</span>
       <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
       {!hasNumbers && <p className="mt-2 text-xs text-zinc-400">Defaults μ=0 σ=1</p>}
@@ -259,7 +261,7 @@ function renderDistribution(latex: string, type: string, label: string) {
 
 function renderInfo(latex: string, type: string, label: string) {
   return (
-    <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div role="img" aria-label={label} className="w-full rounded-lg border border-white/10 bg-black p-4">
       <span className={BADGE}>{type}</span>
       <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
       <p className="mt-2 text-xs text-zinc-400">No 2D plot for this type</p>
@@ -344,7 +346,7 @@ function InspectCard({ latex, label, height }: { latex: string; label: string; h
   };
 
   return (
-    <div role="img" aria-label={label} className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div role="img" aria-label={label} className="w-full rounded-lg border border-white/10 bg-black p-4">
       <span className={BADGE}>{badge}</span>
       <p className="mt-2 break-words font-mono text-sm text-zinc-100">{latex}</p>
       {echo && <p className="mt-1 font-mono text-xs text-zinc-500">normalized: {echo}</p>}

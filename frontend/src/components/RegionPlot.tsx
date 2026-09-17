@@ -25,7 +25,7 @@ export interface JumpTarget {
 const REGION_N = 100;
 const TIME_BUDGET_MS = 150;
 const BADGE =
-  'inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300';
+  'inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-white ring-1 ring-inset ring-white/20';
 const CONST_RE = /(?<![A-Za-z0-9_.])-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?(?![A-Za-z0-9_])/g;
 const noSpace = (s: string): string => s.replace(/\s+/g, '');
 
@@ -242,7 +242,7 @@ export function RegionPlot({ expr, xRange, yRange }: RegionPlotProps) {
       const ctx = cv.getContext('2d');
       if (!ctx) return;
       ctx.clearRect(0, 0, cv.width, cv.height);
-      ctx.fillStyle = '#34d399';
+      ctx.fillStyle = '#FFFFFF';
       const stride = downsampled ? 2 : 1;
       for (let j = 0; j < N; j += stride) {
         for (let i = 0; i < N; i += stride) {
