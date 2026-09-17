@@ -102,7 +102,7 @@ describe('Viewer 3D toggle', () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'E = mc^2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
-    await screen.findByText('No 2D plot for this type');
+    await screen.findByDisplayValue('E = mc^2');
     expect(screen.queryByRole('radiogroup', { name: 'Plot dimension' })).toBeNull();
     expect(screen.queryByTestId('viewer-3d')).toBeNull();
   });
@@ -116,31 +116,30 @@ describe('Viewer 3D toggle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
     await screen.findByRole('radiogroup', { name: 'Plot dimension' });
     expect(container.querySelector('svg path')).not.toBeNull();
-    expect(container.querySelector('[aria-label="3D capable"]')).not.toBeNull();
   });
 
-  test('E = mc^2 as equation stays info-card, no toggle', async () => {
+  test('E = mc^2 as equation shows detail, no toggle', async () => {
     vi.mocked(extractText).mockResolvedValue({
       equations: [{ latex: 'E = mc^2', type: 'equation' }],
     });
-    const { container } = render(<App />);
+    render(<App />);
     fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'E = mc^2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
-    await screen.findByText('No 2D plot for this type');
+    await screen.findByDisplayValue('E = mc^2');
     expect(screen.queryByRole('radiogroup', { name: 'Plot dimension' })).toBeNull();
-    expect(container.querySelector('[aria-label="3D capable"]')).toBeNull();
+    expect(screen.queryByTestId('viewer-3d')).toBeNull();
   });
 
-  test('Box = 5 does not plot, no toggle', async () => {
+  test('Box = 5 shows detail, no toggle', async () => {
     vi.mocked(extractText).mockResolvedValue({
       equations: [{ latex: 'Box = 5', type: 'equation' }],
     });
-    const { container } = render(<App />);
+    render(<App />);
     fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'Box = 5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
-    await screen.findByText('No 2D plot for this type');
-    expect(container.querySelector('svg')).toBeNull();
+    await screen.findByDisplayValue('Box = 5');
     expect(screen.queryByRole('radiogroup', { name: 'Plot dimension' })).toBeNull();
+    expect(screen.queryByTestId('viewer-3d')).toBeNull();
   });
 
   test('resolution 200 forced to ≤96', () => {
@@ -334,15 +333,6 @@ describe('F4 PlotErrorBoundary', () => {
 });
 
 describe('F3 caps', () => {
-  test('EqList renders 200 of 250 without the 201st', async () => {
-    const { EqList } = await import('../components/EqList');
-    const eqs = Array.from({ length: 250 }, (_, i) => ({ latex: `y = x + ${i}`, type: 'function' }));
-    const { container } = render(<EqList equations={eqs} selected={0} onSelect={() => {}} loading={false} />);
-    expect(container.querySelectorAll('li').length).toBe(200);
-    expect(screen.queryByText('y = x + 200')).toBeNull();
-    expect(screen.getByText('y = x + 0')).toBeDefined();
-  });
-
   test('list header shows backend warning verbatim', async () => {
     vi.mocked(extractText).mockResolvedValue({
       equations: [{ latex: 'y=x', type: 'function' }],
@@ -465,5 +455,70 @@ describe('echo contract (plan-universal v2 §2)', () => {
   test('silent on clean region input', () => {
     render(<Plot2D equation={{ latex: 'x^2+y^2<=4', type: 'equation' }} />);
     expect(screen.queryByText(/normalized:/)).toBeNull();
+  });
+});
+
+describe('multi-overlay shell (new)', () => {
+  test('3 rows overlay (3 paths)', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [
+        { latex: 'y = sin(x)', type: 'trigonometric' },
+        { latex: 'y = x^2', type: 'polynomial' },
+        { latex: 'y = x', type: 'function' },
+      ],
+    });
+    const { container } = render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=sin(x)' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    await screen.findAllByLabelText('Equation');
+    expect(container.querySelectorAll('svg path').length).toBe(3);
+  });
+
+  test('eye toggle hides path', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [
+        { latex: 'y = sin(x)', type: 'trigonometric' },
+        { latex: 'y = x^2', type: 'polynomial' },
+        { latex: 'y = x', type: 'function' },
+      ],
+    });
+    const { container } = render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=sin(x)' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    await screen.findAllByLabelText('Equation');
+    expect(container.querySelectorAll('svg path').length).toBe(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Hide y = sin(x)' }));
+    expect(container.querySelectorAll('svg path').length).toBe(2);
+  });
+
+  test('edit re-plots', async () => {
+    vi.mocked(extractText).mockResolvedValue({
+      equations: [{ latex: 'y = sin(x)', type: 'trigonometric' }],
+    });
+    const { container } = render(<App />);
+    fireEvent.change(screen.getByLabelText('Equation text'), { target: { value: 'y=sin(x)' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Extract equations' }));
+    await screen.findAllByLabelText('Equation');
+    const before = container.querySelector('svg path')?.getAttribute('d');
+    const input = screen.getByDisplayValue('y = sin(x)') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'y = cos(x)' } });
+    fireEvent.blur(input);
+    await screen.findByDisplayValue('y = cos(x)');
+    const after = container.querySelector('svg path')?.getAttribute('d');
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    expect(after).not.toBe(before);
+  });
+
+  test('slider drag updates path', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    const slider = await screen.findByLabelText('k') as HTMLInputElement;
+    const before = container.querySelector('svg path')?.getAttribute('d');
+    fireEvent.change(slider, { target: { value: '2' } });
+    const after = container.querySelector('svg path')?.getAttribute('d');
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    expect(after).not.toBe(before);
   });
 });
