@@ -1,10 +1,13 @@
-import { Component, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { checkBackend, type Equation, type ExtractResponse } from './lib/extractApi';
 import { hintFor, showDimensionToggle } from './lib/plotMeta';
+import { PALETTE, duplicateRow, newRow, toggleRow, type Row } from './lib/expressionRows';
+import { DEFAULT_VIEWPORT, panViewport, zoomViewport, type Viewport } from './lib/viewport';
 import { InputTabs } from './components/InputTabs';
-import { EqList } from './components/EqList';
-import { Plot2D } from './components/Plot2D';
-import { centerRangeOn, findJumpTarget, isInequalityLatex } from './components/RegionPlot';
+import { ExpressionList } from './components/ExpressionList';
+import { MultiPlot2D } from './components/MultiPlot2D';
+import { ParamSliders } from './components/ParamSliders';
+import { centerRangeOn, findJumpTarget, isInequalityLatex, RegionPlot } from './components/RegionPlot';
 import { Viewer3D } from './components/Viewer3D';
 import { ParamPanel } from './components/ParamPanel';
 import {
@@ -38,6 +41,17 @@ function focusTabField() {
   document.getElementById('inputtabs-field')?.focus();
 }
 
+function toRows(equations: Equation[]): { rows: Row[]; types: Record<string, string> } {
+  const rows: Row[] = [];
+  const types: Record<string, string> = {};
+  equations.forEach((eq, i) => {
+    const row = newRow(eqText(eq), PALETTE[i % PALETTE.length] as string);
+    rows.push(row);
+    types[row.id] = eqType(eq);
+  });
+  return { rows, types };
+}
+
 type PlotErrorBoundaryProps = { paper: string; index: number; type: string; latex: string; children: ReactNode };
 type PlotErrorBoundaryState = { failed: boolean; fails: number };
 
@@ -64,8 +78,10 @@ export class PlotErrorBoundary extends Component<PlotErrorBoundaryProps, PlotErr
 export default function App() {
   const [backend, setBackend] = useState<BackendState>('checking');
   const [busy, setBusy] = useState(false);
-  const [equations, setEquations] = useState<Equation[]>([]);
-  const [selected, setSelected] = useState(0);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [rowTypes, setRowTypes] = useState<Record<string, string>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
   const [title, setTitle] = useState('');
   const [attempted, setAttempted] = useState(false);
   const [cause, setCause] = useState<string | null>(null);
@@ -94,8 +110,11 @@ export default function App() {
 
   const handleResult = useCallback((r: ExtractResponse, t: string) => {
     const warning = r.warning;
-    setEquations(r.equations ?? []);
-    setSelected(0);
+    const { rows: next, types } = toRows(r.equations ?? []);
+    setRows(next);
+    setRowTypes(types);
+    setSelectedId(next[0]?.id ?? null);
+    setViewport(DEFAULT_VIEWPORT);
     setViewMode('2d');
     setTitle(t);
     setAttempted(true);
@@ -109,8 +128,11 @@ export default function App() {
   }, []);
 
   const handleSample = useCallback(() => {
-    setEquations(sampleEquations());
-    setSelected(0);
+    const { rows: next, types } = toRows(sampleEquations());
+    setRows(next);
+    setRowTypes(types);
+    setSelectedId(next[0]?.id ?? null);
+    setViewport(DEFAULT_VIEWPORT);
     setViewMode('2d');
     setTitle('Sample');
     setAttempted(true);
@@ -119,9 +141,36 @@ export default function App() {
     setCopied(false);
   }, []);
 
-  const handleSelect = useCallback((i: number) => {
-    setSelected(i);
+  const handleSelect = useCallback((id: string) => {
+    setSelectedId(id);
     setViewMode('2d');
+  }, []);
+
+  const handleToggle = useCallback((id: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? toggleRow(r) : r)));
+  }, []);
+
+  const handleDuplicate = useCallback((id: string) => {
+    const found = rows.find((r) => r.id === id);
+    if (!found) return;
+    const copy = duplicateRow(found);
+    setRows((prev) => {
+      const at = prev.findIndex((r) => r.id === id);
+      if (at < 0) return prev;
+      const next = [...prev];
+      next.splice(at + 1, 0, copy);
+      return next;
+    });
+    const t = rowTypes[id] ?? '';
+    setRowTypes((prev) => ({ ...prev, [copy.id]: t }));
+  }, [rows, rowTypes]);
+
+  const handleEdit = useCallback((id: string, latex: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, latex } : r)));
+  }, []);
+
+  const handleParamSliders = useCallback((id: string, patch: Row['params']) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, params: patch } : r)));
   }, []);
 
   const handleParams = useCallback((patch: ParamPatch) => {
@@ -138,12 +187,14 @@ export default function App() {
     }
   }, []);
 
-  const selectedEq = equations[selected] ?? equations[0] ?? null;
-  const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${equations.length} equations${title ? ` — ${title}` : ''}` : ''));
-  const showZero = attempted && !busy && equations.length === 0;
-  const selectedLatex = selectedEq ? eqText(selectedEq) : '';
-  const jumpTarget = selectedEq && !busy && isInequalityLatex(selectedLatex)
-    ? findJumpTarget(selectedLatex, params.xRange, params.yRange)
+  const selectedRow = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
+  const selectedType = selectedRow ? (rowTypes[selectedRow.id] ?? (selectedRow.latex.includes('\\begin') ? 'matrix' : '')) : '';
+  const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${rows.length} equations${title ? ` — ${title}` : ''}` : ''));
+  const showZero = attempted && !busy && rows.length === 0;
+  const selectedLatex = selectedRow ? selectedRow.latex : '';
+  const regionRow = rows.find((r) => r.visible && isInequalityLatex(r.latex)) ?? null;
+  const jumpTarget = regionRow && !busy
+    ? findJumpTarget(regionRow.latex, params.xRange, params.yRange)
     : null;
   const jumpLabel = jumpTarget
     ? jumpTarget.x !== undefined && jumpTarget.y !== undefined
@@ -152,10 +203,10 @@ export default function App() {
         ? `Recenter on x=${jumpTarget.x}`
         : `Recenter on y=${jumpTarget.y}`
     : null;
-  const hasToggle = !!selectedEq
-    && showDimensionToggle(eqType(selectedEq), selectedLatex)
+  const hasToggle = !!selectedRow
+    && showDimensionToggle(selectedType, selectedLatex)
     && !/d[A-Za-z]?\s*\/\s*d\s*x|\\frac\s*\{\s*d/.test(selectedLatex);
-  const regionVisible = !!selectedEq && !busy && (!hasToggle || viewMode === '2d');
+  const regionVisible = !!regionRow && !busy && (!hasToggle || viewMode === '2d');
 
   const handleJump = useCallback(() => {
     setParams((p) => ({
@@ -164,6 +215,30 @@ export default function App() {
       yRange: jumpTarget?.y !== undefined ? centerRangeOn(p.yRange, jumpTarget.y) : p.yRange,
     }));
   }, [jumpTarget]);
+
+  const panRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const el = panRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || 1;
+      const h = rect.height || 1;
+      const fx = (e.clientX - rect.left) / w;
+      const fy = 1 - (e.clientY - rect.top) / h;
+      setViewport((v) => {
+        const cx = v.x[0] + fx * (v.x[1] - v.x[0]);
+        const cy = v.y[0] + fy * (v.y[1] - v.y[0]);
+        const factor = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+        return zoomViewport(v, cx, cy, factor);
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [rows.length]);
 
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100">
@@ -224,30 +299,62 @@ export default function App() {
             </div>
           ) : (
             <>
-              {equations.length > 0 && (
+              {rows.length > 0 && (
                 <p className="mb-3 text-sm text-zinc-400">
-                  {cause ?? `${equations.length} equations${title ? ` — ${title}` : ''}`}
+                  {cause ?? `${rows.length} equations${title ? ` — ${title}` : ''}`}
                 </p>
               )}
-              <EqList equations={equations} selected={selected} onSelect={handleSelect} loading={busy} />
-              {selectedEq && !busy && (
-                <PlotErrorBoundary key={selected} paper={title} index={selected} type={eqType(selectedEq)} latex={eqText(selectedEq)}>
+              <ExpressionList
+                rows={rows}
+                selectedId={selectedRow?.id ?? null}
+                onSelect={handleSelect}
+                onToggle={handleToggle}
+                onDuplicate={handleDuplicate}
+                onEdit={handleEdit}
+              />
+              {selectedRow && !busy && (
+                <PlotErrorBoundary key={selectedRow.id} paper={title} index={0} type={selectedType} latex={selectedLatex}>
                 <section aria-label="Selected equation" className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">
-                      {eqType(selectedEq)}
+                      {selectedType || 'equation'}
                     </span>
                   </div>
                   <p
                     role="img"
-                    aria-label={`Selected equation: ${eqText(selectedEq)}`}
+                    aria-label={`Selected equation: ${selectedLatex}`}
                     className="break-words font-mono text-sm text-zinc-100"
                   >
-                    {eqText(selectedEq)}
+                    {selectedLatex}
                   </p>
+                  <div
+                    ref={panRef}
+                    onPointerDown={(e) => {
+                      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+                      dragRef.current = { x: e.clientX, y: e.clientY };
+                    }}
+                    onPointerMove={(e) => {
+                      const start = dragRef.current;
+                      if (!start) return;
+                      const el = panRef.current;
+                      const rect = el?.getBoundingClientRect();
+                      const w = rect?.width || 1;
+                      const h = rect?.height || 1;
+                      setViewport((v) => {
+                        const dx = -((e.clientX - start.x) / w) * (v.x[1] - v.x[0]);
+                        const dy = ((e.clientY - start.y) / h) * (v.y[1] - v.y[0]);
+                        return panViewport(v, dx, dy);
+                      });
+                      dragRef.current = { x: e.clientX, y: e.clientY };
+                    }}
+                    onPointerUp={() => { dragRef.current = null; }}
+                    onPointerCancel={() => { dragRef.current = null; }}
+                    onDoubleClick={() => setViewport(DEFAULT_VIEWPORT)}
+                  >
+                    <MultiPlot2D rows={rows} viewport={viewport} height={320} />
+                  </div>
                   <div className="mt-3">
-                    {showDimensionToggle(eqType(selectedEq), eqText(selectedEq)) &&
-                    !/d[A-Za-z]?\s*\/\s*d\s*x|\\frac\s*\{\s*d/.test(eqText(selectedEq)) ? (
+                    {hasToggle ? (
                       <>
                         <div
                           role="radiogroup"
@@ -277,12 +384,10 @@ export default function App() {
                             3D
                           </label>
                         </div>
-                        {viewMode === '2d' ? (
-                          <Plot2D equation={selectedEq} xRange={params.xRange} yRange={params.yRange} />
-                        ) : (
+                        {viewMode === '3d' && (
                           <>
                             <Viewer3D
-                              latex={eqText(selectedEq)}
+                              latex={selectedLatex}
                               xRange={params.xRange}
                               yRange={params.yRange}
                               resolution={params.resolution}
@@ -294,8 +399,12 @@ export default function App() {
                           </>
                         )}
                       </>
-                    ) : (
-                      <Plot2D equation={selectedEq} xRange={params.xRange} yRange={params.yRange} />
+                    ) : null}
+                    <ParamSliders row={selectedRow} onChange={(patch) => handleParamSliders(selectedRow.id, patch)} />
+                    {regionVisible && regionRow && (
+                      <div className="mt-3">
+                        <RegionPlot expr={regionRow.latex} xRange={params.xRange} yRange={params.yRange} />
+                      </div>
                     )}
                     {regionVisible && jumpTarget && jumpLabel && (
                       <button
@@ -306,11 +415,11 @@ export default function App() {
                         {jumpLabel}
                       </button>
                     )}
-                    <p className="mt-2 text-xs text-zinc-400">{hintFor(eqType(selectedEq))}</p>
+                    <p className="mt-2 text-xs text-zinc-400">{hintFor(selectedType || 'equation')}</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => void handleCopy(eqText(selectedEq))}
+                    onClick={() => void handleCopy(selectedLatex)}
                     className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                   >
                     {copied ? 'Copied' : 'Copy'}

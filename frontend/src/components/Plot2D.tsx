@@ -23,7 +23,38 @@ const BADGE =
   'inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300';
 
 // ponytail: free params (k, a, b, ...) default to 1; full param UI lands with the 3D panel.
-const DEFAULT_SCOPE = { k: 1, a: 1, b: 1, c: 1, d: 1, m: 1, n: 1, p: 1, q: 1, t: 1, y: 1 };
+export const DEFAULT_SCOPE: Record<string, number> = { k: 1, a: 1, b: 1, c: 1, d: 1, m: 1, n: 1, p: 1, q: 1, t: 1, y: 1 };
+
+// Sampling core shared with MultiPlot2D: compile once, eval n points over
+// xRange with {...DEFAULT_SCOPE, ...scope, x}. Unchanged math from renderFunction.
+export function sampleRow(
+  latex: string,
+  xRange: [number, number],
+  scope: Record<string, number>,
+  n = N_POINTS,
+): Array<[number, number]> {
+  const raw = expandGluedX(normalizeInput(latex));
+  // Fallback subscript drop (Agent A canonical lands in mathParser): X_(...)→X.
+  const expr = raw.replace(/_\([^)]*\)/g, '').replace(/_[A-Za-z0-9]/g, '');
+  if (!expr) throw new Error('empty expression');
+  const code = math.compile(expr);
+  const count = n > 1 ? Math.floor(n) : N_POINTS;
+  const [lo, hi] = xRange;
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i < count; i++) {
+    const x = lo + ((hi - lo) * i) / (count - 1);
+    let y = NaN;
+    try {
+      const v: unknown = code.evaluate({ ...DEFAULT_SCOPE, ...scope, x });
+      const num = typeof v === 'number' ? v : Number(v);
+      if (Number.isFinite(num)) y = num;
+    } catch {
+      y = NaN;
+    }
+    pts.push([x, y]);
+  }
+  return pts;
+}
 
 // Captions come from mathParser.normalizeWithMeta/captionFor (agent A canonical).
 
@@ -74,24 +105,7 @@ function parseMatrixGrid(latex: string): string[][] | null {
 function renderFunction(latex: string, label: string, height: number, captions: string[]) {
   try {
     const h = height > 0 ? height : 320;
-    const raw = expandGluedX(normalizeInput(latex));
-    // Fallback subscript drop (Agent A canonical lands in mathParser): X_(...)→X.
-    const expr = raw.replace(/_\([^)]*\)/g, '').replace(/_[A-Za-z0-9]/g, '');
-    if (!expr) throw new Error('empty expression');
-    const code = math.compile(expr);
-    const pts: Array<[number, number]> = [];
-    for (let i = 0; i < N_POINTS; i++) {
-      const x = X_MIN + ((X_MAX - X_MIN) * i) / (N_POINTS - 1);
-      let y = NaN;
-      try {
-        const v: unknown = code.evaluate({ ...DEFAULT_SCOPE, x });
-        const n = typeof v === 'number' ? v : Number(v);
-        if (Number.isFinite(n)) y = n;
-      } catch {
-        y = NaN;
-      }
-      pts.push([x, y]);
-    }
+    const pts = sampleRow(latex, [X_MIN, X_MAX], DEFAULT_SCOPE, N_POINTS);
     const finite = pts.map(([, y]) => y).filter((v) => Number.isFinite(v));
     if (finite.length === 0) throw new Error('no finite points');
     let ymin = Math.min(...finite);
