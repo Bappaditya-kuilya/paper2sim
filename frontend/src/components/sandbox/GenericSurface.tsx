@@ -130,9 +130,8 @@ export function ParametricSurface({
         normals[i * 3] = 0;
         normals[i * 3 + 1] = 1;
         normals[i * 3 + 2] = 0;
-        const t = positions[i * 3 + 1] / 5;
-        const h = (1.0 - Math.max(0, Math.min(1, t))) * 0.6;
-        const c = new Color().setHSL(h, 0.8, 0.5);
+        const t = Math.max(0, Math.min(1, positions[i * 3 + 1] / 5));
+        const c = new Color().setHSL(0, 0, 0.25 + 0.55 * t);
         colors[i * 3] = c.r;
         colors[i * 3 + 1] = c.g;
         colors[i * 3 + 2] = c.b;
