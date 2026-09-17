@@ -17,8 +17,7 @@ export interface SurfaceConfig {
 
 const defaultColorFn = (z: number, minZ: number, maxZ: number): Color => {
   const t = maxZ === minZ ? 0.5 : (z - minZ) / (maxZ - minZ);
-  const h = (1.0 - t) * 0.6;
-  return new Color().setHSL(h, 0.8, 0.5);
+  return new Color().setHSL(0, 0, 0.25 + 0.55 * t);
 };
 
 export function generateSurface(
