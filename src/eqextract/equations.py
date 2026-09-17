@@ -55,7 +55,7 @@ def _extract_label(text: str, offset: int) -> str | None:
 
 def _looks_like_math(content: str) -> bool:
     """Heuristic check if inline content looks like math notation."""
-    math_ops = r"[=+\-*/<>≤≥≈≠∑∫∏∂∇√∞]|\\(?:frac|sum|int|prod|partial|nabla|sqrt|alpha|beta|gamma|theta|delta|sigma|lambda|omega)"
+    math_ops = r"[=+\-*/<>≤≥≈≠∑∫∏∂∇√∞⌊⌋⌈⌉−]|\\(?:frac|sum|int|prod|partial|nabla|sqrt|alpha|beta|gamma|theta|delta|sigma|lambda|omega)"
     return bool(re.search(math_ops, content))
 
 
@@ -132,14 +132,14 @@ def _line_has_math(line: str) -> bool:
     """Check if a line of text contains mathematical notation."""
     # Trailing unescaped `%...` is a LaTeX comment: strip before every test.
     line = re.sub(r"(?<!\\)%.*", "", line)
-    # Greek letters or math symbols
-    if re.search(r"[αβγδεζηθικλμνξπρστφχψω]", line):
+    # Greek letters or math symbols (complete blocks: lowercase + ς/ο/υ, capitals; ⌊⌋⌈⌉, U+2212).
+    if re.search(r"[αβγδεζηθικλμνξοπρςστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ]", line):
         return True
-    if re.search(r"[∑∫∏∂∇√∞≈≤≥≠±×÷]", line):
+    if re.search(r"[∑∫∏∂∇√∞≈≤≥≠±×÷⌊⌋⌈⌉−]", line):
         return True
     # Lines with = and at least one operator-class char (glued bare forms
     # like `2x` carry their operator from `=`-side context, `|`/`_` included).
-    if "=" in line and re.search(r"[+\-*/^√∑∫|_]", line):
+    if "=" in line and re.search(r"[+\-*/^√∑∫|_−]", line):
         return True
     # Bare function calls carry no operator (y=sin(x), f(x)=x): mirror
     # classify_equation's function rules so functions reach the plot path.
@@ -160,6 +160,16 @@ def _line_has_math(line: str) -> bool:
     if re.search(rf"\b(?:{_GREEK_ALT})\b", line):
         return True
     return False
+
+
+def is_plottable_candidate(line: str) -> bool:
+    """Strict abstract-fallback gate: `=` + math signal, or bare TeX/unicode math."""
+    s = re.sub(r"(?<!\\)%.*", "", line).strip()
+    if not s:
+        return False
+    if re.search(r"\\[A-Za-z]+", s) or any(_is_math_symbol(c) for c in s):
+        return True
+    return "=" in s and bool(re.search(r"[+\-*/^−]|\w+\s*\(", s))
 
 
 # Unicode ranges that are legitimate math content. _line_has_math treats
@@ -206,13 +216,7 @@ def classify_equation(latex: str) -> str:
     Returns one of: function_def, matrix, sum, integral, equation, inequality, unknown
     """
     # Specific patterns FIRST (before generic \frac catch-all)
-    if re.search(r"(?:attention|multihead|softmax|\\operatorname\{softmax\})", latex, re.IGNORECASE):
-        return "function_def"
-    if re.search(r"(?:\\(?:log|sin|cos|tan|exp|max|min|argmax|argmin|softmax)|\\text\{(?:log|sin|cos|tan|exp|max|min|argmax|argmin|softmax)\})\s*[\({]", latex):
-        return "function_def"
-    if re.search(r"(?:layernorm|layer.?norm|sublayer|residual)", latex, re.IGNORECASE):
-        return "function_def"
-    if re.search(r"(?:embedding|vocab|token)", latex, re.IGNORECASE):
+    if re.search(r"(?:\\(?:log|sin|cos|tan|exp|max|min|argmax|argmin)|\\text\{(?:log|sin|cos|tan|exp|max|min|argmax|argmin)\})\s*[\({]", latex):
         return "function_def"
     # Generic patterns
     if re.search(r"\\begin\{(?:bmatrix|pmatrix|vmatrix|matrix|array|cases)\}", latex):
@@ -239,10 +243,8 @@ def classify_equation(latex: str) -> str:
     # Plain inequality, excluding arrows (x -> 0) and shifts (<<, >>, =>)
     if re.search(r"<=|>=|!=|<>|(?<![\-=<>])[<>](?![\-=<>])", latex):
         return "inequality"
-    # Plain function: f(x) = ... | y = sin/cos/...(...) | polynomial/explicit in x
+    # Plain function: f(x) = ... | polynomial/explicit in x
     if re.search(r"^\s*[a-zA-Z]\w*\s*\([^()]*\)\s*=", latex):
-        return "function_def"
-    if re.search(r"=\s*[^=]*\b(sin|cos|tan|asin|acos|atan|exp|log|ln|sqrt|abs)\s*\(", latex):
         return "function_def"
     # Single-var `Name = ...x-form...` with letter-glued x (`y = mx + c`): the
     # older x-rule only sees digit/space-glued x (`2x`), so `mx` fell to equation.

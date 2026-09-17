@@ -6,6 +6,7 @@ Fixes at port time: 15s timeouts, ~5MB download cap raising
 dropped (``urlretrieve`` takes no timeout; e-print covers the need).
 """
 
+import gzip
 import io
 import re
 import tarfile
@@ -16,6 +17,9 @@ from pathlib import Path
 
 TIMEOUT = 15
 MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024
+MAX_PDF_BYTES = 20 * 1024 * 1024
+MAX_PDF_PAGES = 50
+MAX_PDF_TEXT_CHARS = 200 * 1024
 _CHUNK_SIZE = 64 * 1024
 
 
@@ -75,8 +79,12 @@ def download_source(arxiv_id: str, dest_dir: str) -> Path | None:
     if not data:
         return None
 
-    if b"tar" in data[:8] or content_type in ("application/gzip", "application/x-gzip", "application/x-tar"):
-        return _extract_tar_gz(data, dest)
+    if data[:2] == b"\x1f\x8b" or content_type in ("application/gzip", "application/x-gzip", "application/x-tar"):
+        out = _extract_tar_gz(data, dest)
+        if out is not None:
+            return out
+        if data[:2] == b"\x1f\x8b":
+            return _gunzip_single_tex(data, dest)
     return _save_plain_tex(data, dest)
 
 
@@ -104,6 +112,44 @@ def _extract_tar_gz(data: bytes, dest: Path) -> Path | None:
             if f.name == candidate:
                 return f
     return sorted(tex_files)[0]
+
+
+def _gunzip_single_tex(data: bytes, dest: Path) -> Path | None:
+    """Decompress a single gzipped .tex e-print, sniffing out PDF/HTML impostors."""
+    try:
+        raw = gzip.decompress(data)
+    except (OSError, EOFError):
+        return None
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    stripped = text.lstrip()
+    if stripped.startswith("%PDF"):
+        return None
+    low = stripped[:256].lower()
+    if low.startswith("<html") or low.startswith("<!doctype"):
+        return None
+    # ponytail: strictness costs nothing — single-file arXiv e-prints always carry \documentclass.
+    if not any(
+        s in text
+        for s in (
+            "\\documentclass",
+            "\\begin{",
+            "\\end{",
+            "\\section",
+            "\\subsection",
+            "\\usepackage",
+            "\\cite",
+            "\\label",
+            "\\ref",
+            "\\eqref",
+        )
+    ):
+        return None
+    out = dest / "source.tex"
+    out.write_text(text)
+    return out
 
 
 def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
@@ -149,4 +195,55 @@ def get_paper_info(arxiv_id: str) -> dict | None:
         authors = [a.findtext("atom:name", "", ns) for a in entry.findall("atom:author", ns)]
         return {"title": title, "authors": authors, "abstract": abstract}
     except ET.ParseError:
+        return None
+
+
+def fetch_pdf_text(arxiv_id: str) -> str | None:
+    """Fetch the arXiv PDF and extract plain text (ladder step 2).
+
+    Returns the text (capped), ``""`` when the PDF has zero text layer
+    (scanned), or ``None`` when the fetch fails (network, >20MB, non-PDF).
+    """
+    url = f"https://arxiv.org/pdf/{arxiv_id}"
+    req = urllib.request.Request(url, headers={"User-Agent": "paper2sim/0.1"})
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            while True:
+                part = resp.read(_CHUNK_SIZE)
+                if not part:
+                    break
+                total += len(part)
+                if total > MAX_PDF_BYTES:
+                    return None
+                chunks.append(part)
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+    data = b"".join(chunks)
+    if not data:
+        return None
+    try:
+        import fitz  # lazy: PyMuPDF needed only on the PDF path
+    except ImportError:
+        return None
+    try:
+        # ponytail: 50 pages / 200KB cap bounds memory on huge PDFs; raise MAX_PDF_PAGES/MAX_PDF_TEXT_CHARS or stream pages to upgrade
+        parts: list[str] = []
+        chars = 0
+        with fitz.open(stream=data, filetype="pdf") as doc:
+            for i, page in enumerate(doc):
+                if i >= MAX_PDF_PAGES:
+                    break
+                try:
+                    t = page.get_text()
+                except Exception:
+                    continue
+                if t:
+                    parts.append(t)
+                    chars += len(t)
+                    if chars >= MAX_PDF_TEXT_CHARS:
+                        break
+        return "".join(parts)[:MAX_PDF_TEXT_CHARS]
+    except Exception:
         return None

@@ -139,3 +139,16 @@ def test_gate_classify_boundary_spot_checks():
     """Gate accepts plottable bare forms; classify keeps its own contract."""
     assert eqextract.classify_equation("y = sinx") == "function_def"
     assert eqextract.classify_equation("y = 2x+1") == "function_def"
+
+
+def test_is_plottable_candidate_accepts():
+    assert eqextract.equations.is_plottable_candidate("E = mc^2 + x")
+    assert eqextract.equations.is_plottable_candidate("\u03b1 + \u03b2 = \u03b3")
+    assert eqextract.equations.is_plottable_candidate("y=sin(x)")
+
+
+def test_is_plottable_candidate_rejects_prose():
+    assert not eqextract.equations.is_plottable_candidate("plain prose line here")
+    assert not eqextract.equations.is_plottable_candidate("We show x improves over baselines")
+    assert not eqextract.equations.is_plottable_candidate("alpha and beta are parameters")
+    assert not eqextract.equations.is_plottable_candidate("The role of the wandering null geodesic is studied in a black hole")

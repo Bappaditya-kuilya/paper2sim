@@ -56,6 +56,8 @@ _MAX_PDF_BYTES = 20 * 1024 * 1024
 _MAX_PDF_PAGES = 30
 _MAX_CANDIDATES = 200
 _BLOCK_CHARS = 2000
+MAX_TEX_BYTES = 300_000
+MAX_EQUATIONS = 200
 
 
 def _json_get(key: str, ttl: int):
@@ -125,15 +127,17 @@ def _eq():
     return mod
 
 
-def _norm_eq(item, classify) -> dict:
+def _norm_eq(item, classify) -> dict | None:
     latex, etype, label = "", None, None
     if isinstance(item, str):
         latex = item
     elif isinstance(item, dict):
         latex = item.get("latex", item.get("equation", item.get("text", "")))
+        if not isinstance(latex, str):
+            return None
         etype, label = item.get("type"), item.get("label")
-    if not isinstance(latex, str):
-        latex = str(latex)
+    else:
+        return None
     if latex.strip() and not etype:
         try:
             etype = classify(latex)
@@ -152,21 +156,71 @@ def _fetch_arxiv(arxiv_id: str, mod) -> tuple[list[dict], dict, str | None]:
         mod.download_source(arxiv_id, str(dest))  # raises on failure
         tex_files = sorted(dest.rglob("*.tex"))
         if tex_files:
-            content = max(tex_files, key=lambda p: p.stat().st_size).read_text(errors="replace")
+            # ponytail: 300KB total cap bounds memory on huge/bundled sources; raise MAX_TEX_BYTES or stream-parse chunks to upgrade
+            parts: list[str] = []
+            total = 0
+            for p in sorted(tex_files, key=lambda q: q.stat().st_size, reverse=True):
+                if total >= MAX_TEX_BYTES:
+                    break
+                with p.open("rb") as f:
+                    chunk = f.read(MAX_TEX_BYTES - total)
+                total += len(chunk)
+                parts.append(chunk.decode("utf-8", errors="replace"))
+            content = "\n".join(parts)
+            try:
+                info = mod.get_paper_info(arxiv_id) or {}
+            except Exception:
+                info = {}
             try:
                 raw = mod.extract_equations_from_tex(content)
             except Exception:
                 logger.exception("tex extraction failed")
-                return [], {}, "extraction failed"
-            return [_norm_eq(e, mod.classify_equation) for e in raw], {}, None
+                return [], info, "extraction failed"
+            eqs = [e for e in (_norm_eq(x, mod.classify_equation) for x in raw) if e is not None]
+            if len(eqs) > MAX_EQUATIONS:
+                return eqs[:MAX_EQUATIONS], info, f"Showing first {MAX_EQUATIONS} of {len(eqs)} — refine input to narrow."
+            return eqs, info, None
         info = mod.get_paper_info(arxiv_id) or {}
+        # pdf-text ladder: tex missed → PDF text → abstract fallback on failure.
+        pdf_text: str | None = None
+        try:
+            fetch_fn = getattr(mod, "fetch_pdf_text", None)
+            if fetch_fn is None:
+                try:
+                    from eqextract.arxiv import fetch_pdf_text as fetch_fn  # type: ignore[no-redef]
+                except ImportError:
+                    try:
+                        from src.eqextract.arxiv import fetch_pdf_text as fetch_fn  # type: ignore[no-redef]
+                    except ImportError:
+                        fetch_fn = None
+            if fetch_fn is not None:
+                pdf_text = fetch_fn(arxiv_id)
+        except Exception:
+            logger.exception("pdf-text fetch failed")
+            pdf_text = None
+        if pdf_text is not None:
+            if not pdf_text.strip():
+                return [], info, "Scanned PDF — no text layer. Try the TeX source."
+            try:
+                raw = mod.extract_equations_from_text(pdf_text)
+            except Exception:
+                logger.exception("pdf-text extraction failed")
+                return [], info, "extraction failed"
+            eqs = [e for e in (_norm_eq(x, mod.classify_equation) for x in raw) if e is not None]
+            if len(eqs) > MAX_EQUATIONS:
+                return eqs[:MAX_EQUATIONS], info, f"Showing first {MAX_EQUATIONS} of {len(eqs)} — refine input to narrow."
+            return eqs, info, None
         abstract = info.get("summary") or info.get("abstract") or ""
         try:
             raw = mod.extract_equations_from_text(abstract) if abstract.strip() else []
         except Exception:
             logger.exception("abstract extraction failed")
             return [], info, "extraction failed"
-        return [_norm_eq(e, mod.classify_equation) for e in raw], info, "no tex source; extracted from abstract"
+        eqs = [e for e in (_norm_eq(x, mod.classify_equation) for x in raw) if e is not None]
+        eqs = [e for e in eqs if mod.equations.is_plottable_candidate(e.get("latex", ""))]
+        if len(eqs) > MAX_EQUATIONS:
+            return eqs[:MAX_EQUATIONS], info, f"Showing first {MAX_EQUATIONS} of {len(eqs)} — refine input to narrow."
+        return eqs, info, f"{len(eqs)} equations from abstract only — full text unavailable."
 
 
 @app.get("/")
