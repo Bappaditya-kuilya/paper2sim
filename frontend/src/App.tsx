@@ -198,7 +198,8 @@ export default function App() {
                     {eqText(selectedEq)}
                   </p>
                   <div className="mt-3">
-                    {showDimensionToggle(eqType(selectedEq), eqText(selectedEq)) ? (
+                    {showDimensionToggle(eqType(selectedEq), eqText(selectedEq)) &&
+                    !/d[A-Za-z]?\s*\/\s*d\s*x|\\frac\s*\{\s*d/.test(eqText(selectedEq)) ? (
                       <>
                         <div
                           role="radiogroup"
