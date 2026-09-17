@@ -66,10 +66,10 @@ export class PlotErrorBoundary extends Component<PlotErrorBoundaryProps, PlotErr
     if (!this.state.failed) return this.props.children;
     const disabled = this.state.fails >= 2;
     return (
-      <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-        <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">Plot failed</span>
-        <p className="mt-2 break-words font-mono text-sm text-zinc-100">{this.props.latex}</p>
-        <button type="button" disabled={disabled} onClick={() => this.setState({ failed: false })} className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-50">Retry plot</button>
+      <div className="min-w-0 rounded-lg border border-white/10 bg-surface p-4 tabular-nums">
+        <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-gray-300">Plot failed</span>
+        <p className="mt-2 break-words font-mono text-sm tabular-nums text-white">{this.props.latex}</p>
+        <button type="button" disabled={disabled} onClick={() => this.setState({ failed: false })} className="mt-3 min-h-[44px] rounded-full border border-white/20 px-4 py-2 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98] disabled:opacity-50">Retry plot</button>
       </div>
     );
   }
@@ -241,19 +241,19 @@ export default function App() {
   }, [rows.length]);
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-zinc-100">
-      <main className="mx-auto w-full max-w-3xl px-4 py-6 md:py-8">
-        <h1 className="mb-1 text-xl font-semibold">Equation to Plot</h1>
-        <p className="mb-5 text-sm text-zinc-400">Paste any paper math, play with it live.</p>
+    <div className="min-h-screen bg-black font-sans text-white antialiased">
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 tabular-nums md:px-6 md:py-8">
+        <h1 className="mb-1 font-sans text-xl font-semibold tracking-tight text-white">Equation to Plot</h1>
+        <p className="mb-6 text-sm text-gray-300">Paste any paper math, play with it live.</p>
 
         {backend === 'down' && (
-          <div className="mb-4 rounded-lg border border-red-900/60 bg-red-950/30 p-4">
+          <div className="mb-4 rounded-lg border border-red-900/60 bg-red-950/40 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-medium text-red-200">Can&apos;t reach server</p>
               <button
                 type="button"
                 onClick={() => void runCheck()}
-                className="min-h-[44px] rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  className="min-h-[44px] rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-all duration-200 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black active:scale-[.98]"
               >
                 Retry
               </button>
@@ -269,29 +269,29 @@ export default function App() {
           defaultSample={handleSample}
         />
 
-        <p aria-live="polite" className="mt-3 min-h-[20px] text-sm text-zinc-400">
+        <p aria-live="polite" className="mt-3 min-h-[20px] text-sm tabular-nums text-gray-300">
           {backend === 'checking' && !busy ? 'Checking server…' : status}
         </p>
 
-        <div className="mt-4">
+        <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start">
           {showZero ? (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-6 text-center">
-              <p className="text-sm font-medium text-zinc-200">No equations found</p>
-              <p className="mx-auto mt-1 max-w-md text-xs text-zinc-400">
+            <div className="rounded-lg border border-white/10 bg-surface p-4 text-center md:col-span-2">
+              <p className="text-sm font-medium text-white">No equations found</p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-gray-300">
                 {cause?.includes('full text unavailable') ? 'No full text for this paper — its abstract had no plottable math.' : (cause ?? 'No extractable math detected in that input.')}
               </p>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
                 <button
                   type="button"
                   onClick={handleSample}
-                  className="min-h-[44px] rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className="min-h-[44px] rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-all duration-200 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black active:scale-[.98]"
                 >
                   Try sample
                 </button>
                 <button
                   type="button"
                   onClick={focusTabField}
-                  className="min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  className="min-h-[44px] rounded-full border border-white/20 px-4 py-2 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98]"
                 >
                   Edit input
                 </button>
@@ -300,7 +300,7 @@ export default function App() {
           ) : (
             <>
               {rows.length > 0 && (
-                <p className="mb-3 text-sm text-zinc-400">
+                <p className="min-w-0 text-sm tabular-nums text-gray-300 md:col-span-2">
                   {cause ?? `${rows.length} equations${title ? ` — ${title}` : ''}`}
                 </p>
               )}
@@ -314,16 +314,16 @@ export default function App() {
               />
               {selectedRow && !busy && (
                 <PlotErrorBoundary key={selectedRow.id} paper={title} index={0} type={selectedType} latex={selectedLatex}>
-                <section aria-label="Selected equation" className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <section aria-label="Selected equation" className="min-w-0 rounded-lg border border-white/10 bg-surface p-4 tabular-nums">
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-300">
+                    <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-gray-300">
                       {selectedType || 'equation'}
                     </span>
                   </div>
                   <p
                     role="img"
                     aria-label={`Selected equation: ${selectedLatex}`}
-                    className="break-words font-mono text-sm text-zinc-100"
+                    className="break-words font-mono text-sm tabular-nums text-white"
                   >
                     {selectedLatex}
                   </p>
@@ -361,25 +361,25 @@ export default function App() {
                           aria-label="Plot dimension"
                           className="mb-3 flex gap-2"
                         >
-                          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 has-checked:border-zinc-400 has-checked:bg-zinc-900 has-checked:text-zinc-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-zinc-400">
+                          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-gray-300 transition-all duration-200 has-checked:border-white/30 has-checked:bg-white/10 has-checked:text-white focus-within:outline-none focus-within:ring-2 focus-within:ring-white">
                             <input
                               type="radio"
                               name="plot-dimension"
                               value="2d"
                               checked={viewMode === '2d'}
                               onChange={() => setViewMode('2d')}
-                              className="h-4 w-4 accent-emerald-400"
+                              className="h-4 w-4 accent-white"
                             />
                             2D
                           </label>
-                          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 has-checked:border-zinc-400 has-checked:bg-zinc-900 has-checked:text-zinc-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-zinc-400">
+                          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-gray-300 transition-all duration-200 has-checked:border-white/30 has-checked:bg-white/10 has-checked:text-white focus-within:outline-none focus-within:ring-2 focus-within:ring-white">
                             <input
                               type="radio"
                               name="plot-dimension"
                               value="3d"
                               checked={viewMode === '3d'}
                               onChange={() => setViewMode('3d')}
-                              className="h-4 w-4 accent-emerald-400"
+                              className="h-4 w-4 accent-white"
                             />
                             3D
                           </label>
@@ -410,17 +410,17 @@ export default function App() {
                       <button
                         type="button"
                         onClick={handleJump}
-                        className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                        className="mt-3 min-h-[44px] rounded-full border border-white/20 px-4 py-2 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98]"
                       >
                         {jumpLabel}
                       </button>
                     )}
-                    <p className="mt-2 text-xs text-zinc-400">{hintFor(selectedType || 'equation')}</p>
+                    <p className="mt-2 text-xs text-gray-300">{hintFor(selectedType || 'equation')}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => void handleCopy(selectedLatex)}
-                    className="mt-3 min-h-[44px] rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                    className="mt-3 min-h-[44px] rounded-full border border-white/20 px-4 py-2 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98]"
                   >
                     {copied ? 'Copied' : 'Copy'}
                   </button>
