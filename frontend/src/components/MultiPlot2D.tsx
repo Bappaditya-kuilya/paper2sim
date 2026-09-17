@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { DEFAULT_SCOPE, sampleRow } from './Plot2D';
 import { isInequalityLatex } from './RegionPlot';
-import type { Row } from '../lib/expressionRows';
+import { DASH_CYCLE, type Row } from '../lib/expressionRows';
 import type { Viewport } from '../lib/viewport';
 
 interface MultiPlot2DProps {
@@ -69,9 +69,9 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
       <div
         role="img"
         aria-label="No visible plots"
-        className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+        className="w-full rounded-lg border border-white/10 bg-black p-4"
       >
-        <p className="text-sm text-zinc-500">No visible plots</p>
+        <p className="text-sm tabular-nums text-[#D1D5DB]">No visible plots</p>
       </div>
     );
   }
@@ -97,29 +97,31 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
         <line x1={PAD_L} y1={yZero} x2={VIEW_W - PAD_R} y2={yZero} stroke="#a1a1aa" strokeWidth={1} />
         <line x1={xZero} y1={PAD_T} x2={xZero} y2={h - PAD_B} stroke="#a1a1aa" strokeWidth={1} />
         <g clipPath={`url(#${clipId})`}>
-          {paths.map((p) => (
+          {paths.map((p, i) => (
             <path
               key={p.id}
               d={p.d}
               fill="none"
               stroke={p.color}
               strokeWidth={2.5}
+              strokeDasharray={DASH_CYCLE[i % DASH_CYCLE.length] || undefined}
               opacity={hover === null || hover === p.id ? 1 : 0.3}
               onMouseEnter={() => setHover(p.id)}
               onMouseLeave={() => setHover(null)}
               onFocus={() => setHover(p.id)}
               onBlur={() => setHover(null)}
-              style={{ pointerEvents: 'stroke' }}
+              style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+              className="transition-opacity"
             />
           ))}
         </g>
         {xTicks.map((t) => (
-          <text key={`tx${t}`} x={xToPx(t)} y={h - PAD_B + 16} textAnchor="middle" fontSize={10} fill="#a1a1aa">
+          <text key={`tx${t}`} x={xToPx(t)} y={h - PAD_B + 16} textAnchor="middle" fontSize={10} fill="#a1a1aa" className="tabular-nums">
             {fmt(t)}
           </text>
         ))}
         {yTicks.map((t) => (
-          <text key={`ty${t}`} x={PAD_L - 6} y={yToPx(t) + 3} textAnchor="end" fontSize={10} fill="#a1a1aa">
+          <text key={`ty${t}`} x={PAD_L - 6} y={yToPx(t) + 3} textAnchor="end" fontSize={10} fill="#a1a1aa" className="tabular-nums">
             {fmt(t)}
           </text>
         ))}
