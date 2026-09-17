@@ -84,21 +84,80 @@ def extract_equations_from_text(text: str) -> list[dict[str, str]]:
     return equations
 
 
+# Frontend mirrors (mathParser.ts): general classes, never per-input names.
+_FUNC_NAMES = frozenset(
+    {
+        "sin",
+        "cos",
+        "tan",
+        "sec",
+        "csc",
+        "cot",
+        "asin",
+        "acos",
+        "atan",
+        "sinh",
+        "cosh",
+        "tanh",
+        "log",
+        "ln",
+        "log2",
+        "log10",
+        "sqrt",
+        "cbrt",
+        "abs",
+        "exp",
+        "factorial",
+        "ceil",
+        "floor",
+        "round",
+        "min",
+        "max",
+        "pow",
+        "softmax",
+        "sigmoid",
+        "relu",
+        "gelu",
+        "step",
+    }
+)
+_GREEK_NAMES = frozenset(
+    {"alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa", "lambda", "mu", "nu", "xi", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega"}
+)
+_FUNC_ALT = "|".join(sorted(_FUNC_NAMES, key=len, reverse=True))
+_GREEK_ALT = "|".join(sorted(_GREEK_NAMES))
+
+
 def _line_has_math(line: str) -> bool:
     """Check if a line of text contains mathematical notation."""
+    # Trailing unescaped `%...` is a LaTeX comment: strip before every test.
+    line = re.sub(r"(?<!\\)%.*", "", line)
     # Greek letters or math symbols
     if re.search(r"[αβγδεζηθικλμνξπρστφχψω]", line):
         return True
     if re.search(r"[∑∫∏∂∇√∞≈≤≥≠±×÷]", line):
         return True
-    # Lines with = and at least one operator
-    if re.search(r"=", line) and re.search(r"[+\-*/^√∑∫]", line):
+    # Lines with = and at least one operator-class char (glued bare forms
+    # like `2x` carry their operator from `=`-side context, `|`/`_` included).
+    if "=" in line and re.search(r"[+\-*/^√∑∫|_]", line):
         return True
     # Bare function calls carry no operator (y=sin(x), f(x)=x): mirror
     # classify_equation's function rules so functions reach the plot path.
     if re.search(r"=\s*[^=]*\b(sin|cos|tan|asin|acos|atan|exp|log|ln|sqrt|abs)\s*\(", line):
         return True
     if re.match(r"\s*[a-zA-Z]\w*\s*\([^()]*\)\s*=", line):
+        return True
+    # Paren-less calls: known func name glued to letter/digit/paren (sinx).
+    if re.search(rf"\b(?:{_FUNC_ALT})(?=[A-Za-z0-9(])", line, re.IGNORECASE):
+        return True
+    # Subscript marker glued to its index (x_i, log_2).
+    if re.search(r"_[({A-Za-z0-9]", line):
+        return True
+    # Pipe pair with non-empty interior (|x|).
+    if re.search(r"\|[^|]+\|", line):
+        return True
+    # Bare greek names as whole words (alpha).
+    if re.search(rf"\b(?:{_GREEK_ALT})\b", line):
         return True
     return False
 
