@@ -1,3 +1,5 @@
+import { parseExpr, freeSymbols, GREEK_NAMES } from './mathParser';
+
 export function isFunctionLike(type: string): boolean {
   const t = type.toLowerCase();
   return (
@@ -11,16 +13,15 @@ export function isFunctionLike(type: string): boolean {
   );
 }
 
-// Function-call names stripped (when followed by `(`) before x-detection, so the
-// x in `max (` / `exp (` can't fake an x-variable. ponytail: pure regex, no
-// mathjs import — parse isn't in the tree-shaken bundle.
-const FUNC_CALL = /\\?\b(asin|acos|atan|sinh|cosh|tanh|sin|cos|tan|exp|log|ln|sqrt|cbrt|max|min|abs)\s*\(/g;
-
+// P3 AST gate: function-call awareness comes from parse (free-symbols),
+// not a hand-copied FUNC_CALL list. The x in `max (` / `exp (` is a bound
+// function name there, so it can never fake an x-variable.
 function hasXVar(s: string): boolean {
-  const t = s.replace(FUNC_CALL, '(');
-  return (
-    /(^|[^A-Za-z0-9_)])x(?![A-Za-z0-9_(])/.test(t) || /[A-Za-z0-9)]x(?![A-Za-z0-9_(])/.test(t)
-  );
+  try {
+    return freeSymbols(parseExpr(expandGluedX(s))).includes('x');
+  } catch {
+    return /(^|[^A-Za-z0-9])x(?![A-Za-z0-9])/.test(s);
+  }
 }
 
 // Letter/digit-glued implicit multiply around x (`mx`/`2x`/`)x` → `m*x`/...).
@@ -29,6 +30,8 @@ function hasXVar(s: string): boolean {
 // (mathjs constant e) — accepted, failures land on the honest `not plottable`
 // badge downstream. Idempotent (`m*x` is stable) and func-call safe (`exp(x)`,
 // `max(a,b)` untouched: the x there is followed by `(`/a letter).
+// Kept because the word tokenizer only sees space-separated words — glued
+// `mx`/`2x` never reach it. One regex line, justified.
 export function expandGluedX(expr: string): string {
   return expr.replace(/([A-Za-z0-9)])(x)(?![A-Za-z0-9_(])/g, '$1*$2');
 }
@@ -52,26 +55,28 @@ export function plotSide(latex: string): string | null {
   return null;
 }
 // Free symbols default to 1 (mirrors Plot2D's DEFAULT_SCOPE, minus x/y which are
-// 3D axes here, minus e/pi/tau which are mathjs constants). Word boundaries keep
-// function names (sin, sqrt, log10) untouched. ponytail: regex, not mathjs parse —
-// parse isn't in the tree-shaken bundle and this covers the blessed set exactly.
-// Textual defaults only; multi-letter typos still throw (honest badge, never flat line).
-const FREE_SINGLE = new Set(
-  [...'abcdefghijklmnopqrstuvwxyz'].filter((c) => c !== 'x' && c !== 'y' && c !== 'e'),
-);
-// ponytail: pi/tau excluded (mathjs constants, not params).
-const FREE_GREEK = new Set([
-  'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
-  'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'rho',
-  'sigma', 'upsilon', 'phi', 'chi', 'psi', 'omega',
-]);
-
+// 3D axes here, minus e/pi/tau which are mathjs constants). Derived from the
+// AST (P3): parse → free-symbols → default singles + greek names from the
+// mathParser TeX map. Textual defaults only; multi-letter typos still throw
+// (honest badge, never flat line).
 export function defaultFreeParams(expr: string): string {
-  const singles = expr.replace(/\b([a-z])\b/g, (name) => (FREE_SINGLE.has(name) ? '(1)' : name));
-  return singles.replace(
-    /\b(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|rho|sigma|upsilon|phi|chi|psi|omega)\b/g,
-    (name) => (FREE_GREEK.has(name) ? '(1)' : name),
-  );
+  let frees: string[] = [];
+  try {
+    frees = freeSymbols(parseExpr(expr));
+  } catch {
+    return expr;
+  }
+  let out = expr;
+  for (const sym of frees) {
+    if (sym === 'x' || sym === 'y') continue;
+    if (/^[a-z]$/.test(sym)) {
+      if (sym === 'e') continue;
+      out = out.replace(new RegExp(`\\b${sym}\\b`, 'g'), '(1)');
+    } else if (GREEK_NAMES.has(sym)) {
+      out = out.replace(new RegExp(`\\b${sym}\\b`, 'g'), '(1)');
+    }
+  }
+  return out;
 }
 
 export function showDimensionToggle(type: string, latex: string): boolean {

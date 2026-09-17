@@ -51,7 +51,7 @@ import {
   eDependencies,
   tauDependencies,
 } from 'mathjs';
-import type { Matrix } from 'mathjs';
+import type { Matrix, MathNode } from 'mathjs';
 
 const math = create({
   compileDependencies,
@@ -115,50 +115,143 @@ const GREEK_MAP: Record<string, string> = {
   '\\chi': 'chi', '\\psi': 'psi', '\\omega': 'omega',
 };
 
-const WORD_MAP: Record<string, string> = {
-  'square root of': 'sqrt',
-  'cube root of': 'cbrt',
-  'divided by': '/',
-  'raised to': '^',
-  'to the power of': '^',
-  'arc sine': 'asin',
-  'arc cosine': 'acos',
-  'arc tangent': 'atan',
-  'hyperbolic sine': 'sinh',
-  'hyperbolic cosine': 'cosh',
-  'hyperbolic tangent': 'tanh',
-  'natural log': 'log',
-  'log base 10': 'log10',
-  'log base 2': 'log2',
-  'absolute value of': 'abs',
-  'factorial of': 'factorial',
-  'squared': '^2',
-  'cubed': '^3',
-  'sine': 'sin',
-  'cosine': 'cos',
-  'tangent': 'tan',
-  'plus': '+',
-  'minus': '-',
-  'times': '*',
-};
-
-export const FUNC_NAMES = new Set([
-  'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'asin', 'acos', 'atan',
-  'sinh', 'cosh', 'tanh', 'log', 'ln', 'log2', 'log10', 'sqrt', 'cbrt',
-  'abs', 'exp', 'factorial', 'ceil', 'floor', 'round', 'min', 'max', 'pow',
-  'softmax', 'sigmoid', 'relu', 'gelu', 'step',
-]);
+// ponytail: derived view of GREEK_MAP values for scope checks — no second list.
+export const GREEK_NAMES: ReadonlySet<string> = new Set(Object.values(GREEK_MAP));
 
 export type Assumption = 'param-default' | 'base-omitted' | 'subscript-dropped';
 
-export function captionFor(a: Assumption): string {
-  if (a === 'param-default') return 'Showing m=1 — free parameter defaulted.';
-  if (a === 'base-omitted') return 'Showing log₁₀(x) — base not specified.';
-  return 'Showing x — subscript dropped for 2D.';
+export interface ScopeEntry {
+  symbol: string;
+  value: string | number;
+  reason: string;
 }
 
-function isFunctionWord(word: string): boolean {
-  return FUNC_NAMES.has(word);
+// Generic renderer: new assumption kinds need no code change — they travel
+// through the DATA path (ScopeEntry), not a per-reason switch.
+export function captionsFromScope(diff: ScopeEntry[]): string[] {
+  return diff.map((e) => {
+    if (e.value === '' || e.value === null || e.value === undefined) {
+      return `Showing ${e.symbol} — ${e.reason}.`;
+    }
+    return `Showing ${e.symbol}=${e.value} — ${e.reason}.`;
+  });
+}
+
+export function captionFor(a: Assumption): string {
+  if (a === 'param-default') {
+    const s = captionsFromScope([{ symbol: 'm', value: 1, reason: 'free parameter defaulted' }])[0];
+    return s ?? '';
+  }
+  if (a === 'base-omitted') {
+    const s = captionsFromScope([{ symbol: 'log₁₀(x)', value: '', reason: 'base not specified' }])[0];
+    return s ?? '';
+  }
+  const s = captionsFromScope([{ symbol: 'x', value: '', reason: 'subscript dropped for 2D' }])[0];
+  return s ?? '';
+}
+
+// P2: runtime-derived function table. Probe is expression-scope evaluation:
+// known iff the name resolves to something callable in an expression
+// (unknown names throw `Undefined function`). Zero hand-copied lists —
+// customs (softmax/sigmoid/relu/gelu/step) are found automatically because
+// registerCustomFunctions() imports them into the same instance.
+const knownFuncCache = new Map<string, boolean>();
+
+export function isKnownFunc(name: string): boolean {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) return false;
+  const hit = knownFuncCache.get(name);
+  if (hit !== undefined) return hit;
+  const entry: unknown = (math as unknown as Record<string, unknown>)[name];
+  let result = false;
+  if (typeof entry === 'function') {
+    try {
+      math.compile(`${name}(0)`).evaluate({});
+      result = true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      result = !/Undefined function/.test(msg);
+    }
+  } else {
+    result = false;
+  }
+  knownFuncCache.set(name, result);
+  return result;
+}
+
+function isFuncWord(word: string): boolean {
+  return isKnownFunc(word) || isKnownFunc(word.toLowerCase());
+}
+
+// P1: sole frontend parse entry. Length cap 10k, balanced-brace pre-check,
+// try/catch, traverse node cap 1000. Throws Error with reason, never garbage.
+export function parseExpr(expr: string): MathNode {
+  if (expr.length > 10000) throw new Error('card: expression exceeds 10k length cap');
+  const stack: string[] = [];
+  const pairs: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
+  for (const ch of expr) {
+    if (ch === '(' || ch === '[' || ch === '{') stack.push(ch);
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      const want = pairs[ch];
+      const got = stack.pop();
+      if (got !== want) throw new Error(`card: unbalanced bracket ${ch}`);
+    }
+  }
+  if (stack.length > 0) throw new Error('card: unbalanced brackets');
+  try {
+    const node = math.parse(expr);
+    let count = 0;
+    node.traverse(() => {
+      count += 1;
+      if (count > 1000) throw new Error('card: node cap 1000 exceeded');
+    });
+    return node;
+  } catch (e) {
+    if (e instanceof Error && /^card: /.test(e.message)) throw e;
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`card: ${msg}`);
+  }
+}
+
+// P3: traverse free SymbolNodes minus mathjs constants in the bundle
+// (pi/e/tau resolve to non-functions on the instance — runtime-derived).
+// Function-position symbols (fn of a FunctionNode) are bound, not free.
+export function freeSymbols(node: MathNode): string[] {
+  const found = new Set<string>();
+  const mathRecord = math as unknown as Record<string, unknown>;
+  node.traverse((child, _path, parent) => {
+    const c = child as unknown as { isSymbolNode?: boolean; name?: unknown };
+    if (!c.isSymbolNode || typeof c.name !== 'string') return;
+    const p = parent as unknown as { isFunctionNode?: boolean; fn?: unknown } | undefined;
+    if (p?.isFunctionNode === true && p.fn === child) return;
+    const name = c.name;
+    if (name in mathRecord && typeof mathRecord[name] !== 'function') return;
+    found.add(name);
+  });
+  return [...found].sort();
+}
+
+// P3 scope data feeding the generic renderer. Params are singles (minus
+// axes/constants) plus greek names derived from GREEK_MAP. Multi-letter
+// typos are deliberately omitted — textual defaults only, typos still throw
+// downstream (honest badge, never flat line).
+export function scopeDiff(normalized: string): ScopeEntry[] {
+  let frees: string[] = [];
+  try {
+    frees = freeSymbols(parseExpr(normalized));
+  } catch {
+    return [];
+  }
+  const out: ScopeEntry[] = [];
+  for (const sym of frees) {
+    if (sym === 'x' || sym === 'y') continue;
+    if (/^[a-z]$/.test(sym)) {
+      if (sym === 'e') continue;
+      out.push({ symbol: sym, value: 1, reason: 'free parameter defaulted' });
+    } else if (GREEK_NAMES.has(sym)) {
+      out.push({ symbol: sym, value: 1, reason: 'free parameter defaulted' });
+    }
+  }
+  return out;
 }
 
 // CARD gate: sum/integral/product and derivative forms have no bounds-capable
@@ -170,8 +263,61 @@ function cardReason(input: string): string | null {
   return null;
 }
 
+// L0 unicode head: detect-first NFKC + punct/fraction/class maps.
+// ponytail: NFKC folds fullwidth + mathematical alphanumerics (capitals
+// included) with zero new deps; explicit maps cover what NFKC cannot
+// (superscripts must convert BEFORE NFKC or the ^ is lost; U+2044 fraction
+// slash appears only AFTER NFKC splits vulgar fractions like ½→1⁄2).
+function unicodeHead(s: string): string {
+  // printable-ASCII range test (no control escapes, lint-clean).
+  if (!/[^ -~]/.test(s)) return s;
+  const supMap: Record<string, string> = {
+    '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+    '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
+  };
+  s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => {
+    let digits = '';
+    for (const ch of m) digits += supMap[ch] ?? '';
+    return `^(${digits})`;
+  });
+  const subMap: Record<string, string> = {
+    '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4',
+    '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9',
+  };
+  s = s.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, (m) => {
+    let digits = '';
+    for (const ch of m) digits += subMap[ch] ?? '';
+    return `_${digits}`;
+  });
+  s = s.normalize('NFKC');
+  s = s.replace(/⁄/g, '/');
+  s = s.replace(/[−–—‐‑]/g, '-');
+  s = s.replace(/[×⋅·∙⋆]/g, '*');
+  s = s.replace(/[÷]/g, '/');
+  s = s.replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/≠/g, '!=');
+  s = s.replace(/⟨/g, '<').replace(/⟩/g, '>');
+  s = s.replace(/⌊([^⌊⌋⌈⌉]+)⌋/g, 'floor($1)');
+  s = s.replace(/⌈([^⌊⌋⌈⌉]+)⌉/g, 'ceil($1)');
+  const greekUnicode: Record<string, string> = {
+    'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon',
+    'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ι': 'iota', 'κ': 'kappa',
+    'λ': 'lambda', 'μ': 'mu', 'ν': 'nu', 'ξ': 'xi', 'ο': 'o', 'π': 'pi',
+    'ρ': 'rho', 'σ': 'sigma', 'ς': 'sigma', 'τ': 'tau', 'υ': 'upsilon',
+    'φ': 'phi', 'χ': 'chi', 'ψ': 'psi', 'ω': 'omega',
+    'Α': 'alpha', 'Β': 'beta', 'Γ': 'gamma', 'Δ': 'delta', 'Ε': 'epsilon',
+    'Ζ': 'zeta', 'Η': 'eta', 'Θ': 'theta', 'Ι': 'iota', 'Κ': 'kappa',
+    'Λ': 'lambda', 'Μ': 'mu', 'Ν': 'nu', 'Ξ': 'xi', 'Ο': 'o', 'Π': 'pi',
+    'Ρ': 'rho', 'Σ': 'sigma', 'Τ': 'tau', 'Υ': 'upsilon', 'Φ': 'phi',
+    'Χ': 'chi', 'Ψ': 'psi', 'Ω': 'omega',
+  };
+  for (const [ch, name] of Object.entries(greekUnicode)) {
+    if (s.includes(ch)) s = s.split(ch).join(name);
+  }
+  return s;
+}
+
 export function stripLatex(input: string): string {
-  let s = input.trim();
+  let s = unicodeHead(input.trim());
   // L0: unescaped %.* comments; \% keeps a literal percent.
   s = s.replace(/(?<!\\)%.*/g, '');
   s = s.replace(/\\%/g, '%');
@@ -203,41 +349,224 @@ export function stripLatex(input: string): string {
   s = s.replace(/([a-zA-Z]+)_\{[^}]*\}/g, '$1');
   s = s.replace(/\^([a-zA-Z0-9])/g, '^($1)');
   s = s.replace(/([a-zA-Z]+)_([a-zA-Z0-9])/g, '$1');
+  // L1: bare trailing digits on a single letter read as subscript (y17 → y,
+  // same class as X_{..} above). Multi-letter runs (log2, H2O, alpha1) never
+  // match: lookarounds require a lone letter. Known funcs can't match either
+  // (all multi-letter), so no isKnownFunc check needed here.
+  s = s.replace(/(?<![A-Za-z0-9])([A-Za-z])(\d+)(?![A-Za-z0-9])/g, '$1');
   for (const [latex, name] of Object.entries(GREEK_MAP)) {
     s = s.split(latex).join(name);
   }
-  s = s.replace(/\\(sin|cos|tan|sec|csc|cot|asin|acos|atan|sinh|cosh|tanh|log|ln|log2|log10|sqrt|cbrt|abs|exp|factorial|ceil|floor|round)\b/g, '$1');
-  s = s.replace(/\\[a-zA-Z]+/g, '');
+  // L1 func un-escape derives from the runtime namespace (P2) — no fork.
+  // `ln` is the one alias the bundle lacks (mapped to log downstream).
+  s = s.replace(/\\([A-Za-z][A-Za-z0-9]*)\b/g, (m, cmd: string) => {
+    if (isKnownFunc(cmd)) return cmd;
+    if (cmd === 'ln') return cmd;
+    return m;
+  });
+  // L2: shredder deleted — unknown commands card with reason, never vanish.
+  const unknown = s.match(/\\[A-Za-z][A-Za-z0-9]*/);
+  if (unknown) throw new Error(`card: unknown LaTeX command ${unknown[0]}`);
   // L1: matched |..| → abs(..), after \left\right stripping.
   s = s.replace(/\|([^|]+)\|/g, 'abs($1)');
   s = s.replace(/\{/g, '(').replace(/\}/g, ')');
   return s.trim();
 }
 
-// Func-prefix split over FUNC_NAMES: sinx→sin(x), log2x→log2(x).
-// Longest-first so log2 wins over log; whole-word so sin(x) stays.
-function splitFuncPrefix(expr: string): string {
-  const names = [...FUNC_NAMES].sort((a, b) => b.length - a.length);
-  return expr.replace(/\b([a-zA-Z][a-zA-Z0-9]*)\b/g, (word) => {
-    if (isFunctionWord(word)) return word;
-    for (const fn of names) {
-      if (word.startsWith(fn)) {
-        const rest = word.slice(fn.length);
-        if (rest.length > 0 && /^[a-zA-Z0-9]+$/.test(rest)) return `${fn}(${rest})`;
-      }
-    }
-    return word;
-  });
+// L1 spoken tokenizer (VoxTeX semantics). Word-token passes only — never
+// substring split/join (which corrupts `sometimes`→`some*`). Ordered passes:
+// paren-nesting counter → multi-word funcs → postfix powers → binary ops →
+// `over` LAST (exactly-one, non-empty sides, tight-binding parens, quantity
+// grouping, `all over` collapse). Cards on unbalanced/depth>3/
+// unknown-between-tokens/double-ops.
+function tokenizeSpoken(lower: string): string[] {
+  return lower.match(/[a-z][a-z0-9]*|\d+(?:\.\d+)?|<=|>=|==|!=|[()+*/^.<>=\-&|]/g) ?? [];
 }
 
-// L4 letter-split: exactly-2 single-letter runs → a*b. Exempt length≥3 words
-// (alpha), FUNC_NAMES, mathjs constants (e,pi,tau), dx token.
-// ponytail: ex→e*x admitted casualty (e is a constant but the pair still splits).
-function splitLetterPairs(expr: string): string {
-  return expr.replace(/\b([a-zA-Z0-9]+)\b/g, (word) => {
-    if (isFunctionWord(word)) return word;
-    if (word === 'e' || word === 'pi' || word === 'tau' || word === 'dx') return word;
-    if (/^[a-zA-Z]{2}$/.test(word)) return `${word[0]}*${word[1]}`;
+function hasSpokenTrigger(tokens: string[]): boolean {
+  // Trigger vocabulary: the multi/single maps' keys plus bare comparison and
+  // bare known-function words (floor, min, ...) — grammatical classes, not cases.
+  // Unknown prose still cards downstream via the unknown-word check.
+  for (const t of tokens) {
+    if (
+      t === 'sine' || t === 'cosine' || t === 'tangent' ||
+      t === 'plus' || t === 'minus' || t === 'times' ||
+      t === 'squared' || t === 'cubed' || t === 'over' ||
+      t === 'less' || t === 'greater' || t === 'equal' || t === 'equals' ||
+      t === 'floor' || t === 'ceil' || t === 'round' || t === 'min' || t === 'max' ||
+      t === 'abs' || t === 'div' || t === 'mod'
+    ) return true;
+  }
+  const seqs: string[][] = [
+    ['square', 'root', 'of'], ['cube', 'root', 'of'],
+    ['divided', 'by'], ['raised', 'to'], ['to', 'the', 'power', 'of'],
+    ['arc', 'sine'], ['arc', 'cosine'], ['arc', 'tangent'],
+    ['hyperbolic', 'sine'], ['hyperbolic', 'cosine'], ['hyperbolic', 'tangent'],
+    ['natural', 'log'], ['log', 'base', '10'], ['log', 'base', '2'],
+    ['absolute', 'value', 'of'], ['factorial', 'of'],
+  ];
+  for (const seq of seqs) {
+    for (let i = 0; i + seq.length <= tokens.length; i++) {
+      let ok = true;
+      for (let j = 0; j < seq.length; j++) {
+        if (tokens[i + j] !== seq[j]) { ok = false; break; }
+      }
+      if (ok) return true;
+    }
+  }
+  return false;
+}
+
+export function spokenToMath(input: string): string {
+  const lower = input.toLowerCase();
+  const tokens = tokenizeSpoken(lower);
+  if (!hasSpokenTrigger(tokens)) return input;
+  let depth = 0;
+  let maxDepth = 0;
+  for (const ch of input) {
+    if (ch === '(') { depth += 1; if (depth > maxDepth) maxDepth = depth; }
+    else if (ch === ')') {
+      depth -= 1;
+      if (depth < 0) throw new Error('card: unbalanced parentheses in spoken input');
+    }
+  }
+  if (depth !== 0) throw new Error('card: unbalanced parentheses in spoken input');
+  if (maxDepth > 3) throw new Error('card: parenthesis depth>3 in spoken input');
+
+  const multi: Array<{ src: string[]; dst: string[] }> = [
+    { src: ['is', 'less', 'than', 'or', 'equal', 'to'], dst: ['<='] },
+    { src: ['less', 'than', 'or', 'equal', 'to'], dst: ['<='] },
+    { src: ['is', 'greater', 'than', 'or', 'equal', 'to'], dst: ['>='] },
+    { src: ['greater', 'than', 'or', 'equal', 'to'], dst: ['>='] },
+    { src: ['is', 'not', 'equal', 'to'], dst: ['!='] },
+    { src: ['not', 'equal', 'to'], dst: ['!='] },
+    { src: ['is', 'less', 'than'], dst: ['<'] },
+    { src: ['less', 'than'], dst: ['<'] },
+    { src: ['is', 'greater', 'than'], dst: ['>'] },
+    { src: ['greater', 'than'], dst: ['>'] },
+    { src: ['is', 'equal', 'to'], dst: ['='] },
+    { src: ['equal', 'to'], dst: ['='] },
+    { src: ['equals'], dst: ['='] },
+    { src: ['to', 'the', 'power', 'of'], dst: ['^'] },
+    { src: ['square', 'root', 'of'], dst: ['sqrt'] },
+    { src: ['cube', 'root', 'of'], dst: ['cbrt'] },
+    { src: ['hyperbolic', 'sine'], dst: ['sinh'] },
+    { src: ['hyperbolic', 'cosine'], dst: ['cosh'] },
+    { src: ['hyperbolic', 'tangent'], dst: ['tanh'] },
+    { src: ['absolute', 'value', 'of'], dst: ['abs'] },
+    { src: ['natural', 'log'], dst: ['log'] },
+    { src: ['log', 'base', '10'], dst: ['log10'] },
+    { src: ['log', 'base', '2'], dst: ['log2'] },
+    { src: ['arc', 'sine'], dst: ['asin'] },
+    { src: ['arc', 'cosine'], dst: ['acos'] },
+    { src: ['arc', 'tangent'], dst: ['atan'] },
+    { src: ['factorial', 'of'], dst: ['factorial'] },
+    { src: ['divided', 'by'], dst: ['/'] },
+    { src: ['raised', 'to'], dst: ['^'] },
+  ];
+  let out: string[] = [];
+  for (let i = 0; i < tokens.length;) {
+    let matched = false;
+    for (const { src, dst } of multi) {
+      if (i + src.length > tokens.length) continue;
+      let ok = true;
+      for (let j = 0; j < src.length; j++) {
+        if (tokens[i + j] !== src[j]) { ok = false; break; }
+      }
+      if (ok) {
+        out.push(...dst);
+        i += src.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) { out.push(tokens[i] ?? ''); i += 1; }
+  }
+  const single: Record<string, string> = {
+    'sine': 'sin', 'cosine': 'cos', 'tangent': 'tan',
+    'plus': '+', 'minus': '-', 'times': '*',
+    'squared': '^(2)', 'cubed': '^(3)',
+  };
+  out = out.map((t) => single[t] ?? t);
+  // `all over` collapses to one `over` before the exactly-one check.
+  const collapsed: string[] = [];
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] === 'all' && out[i + 1] === 'over') continue;
+    collapsed.push(out[i] ?? '');
+  }
+  out = collapsed;
+  const overIdx: number[] = [];
+  out.forEach((t, i) => { if (t === 'over') overIdx.push(i); });
+  if (overIdx.length > 1) throw new Error('card: multiple over in one expression');
+  if (overIdx.length === 1) {
+    const k = overIdx[0] ?? 0;
+    const left = (out.slice(0, k)).filter((t) => t !== 'quantity');
+    const right = (out.slice(k + 1)).filter((t) => t !== 'quantity');
+    if (left.length === 0 || right.length === 0) throw new Error('card: over needs non-empty sides');
+    out = ['(', ...left, ')', '/', '(', ...right, ')'];
+  }
+  // Articles `the`/`an` are never math symbols (multi-letter non-func words
+  // would card) — drop, don't card. `of` drops only before `(` (floor of (x)
+  // → floor (x), valid application); bare `of` keeps carding honestly.
+  // Single-letter `a` stays: valid parameter.
+  out = out.filter((t, i) => {
+    if (t === 'the' || t === 'an') return false;
+    if (t === 'of') return !(out[i + 1] ?? '').startsWith('(');
+    return true;
+  });
+  const mathRecord = math as unknown as Record<string, unknown>;
+  for (const t of out) {
+    if (!/^[a-z][a-z0-9]*$/.test(t)) continue;
+    if (t.length === 1) continue;
+    if (t === 'quantity' || t === 'all' || t === 'over') {
+      throw new Error(`card: unexpected spoken word ${t}`);
+    }
+    if (isKnownFunc(t)) continue;
+    if (GREEK_NAMES.has(t)) continue;
+    if (t in mathRecord && typeof mathRecord[t] !== 'function') continue;
+    throw new Error(`card: unknown word between tokens ${t}`);
+  }
+  // Postfix ^(2)/^(3) terminate an operand — `x^2 + 1` is valid sequencing,
+  // so only bare binary ops count for double-ops. A binary directly feeding
+  // a postfix (`+ ^(2)`) or two postfixes in a row have no base → card.
+  const isBin = (t: string): boolean =>
+    t === '+' || t === '-' || t === '*' || t === '/' || t === '^';
+  const isPost = (t: string): boolean => t.startsWith('^(');
+  if (out.length > 0) {
+    const first = out[0] ?? '';
+    const last = out[out.length - 1] ?? '';
+    if (isPost(first)) throw new Error('card: leading operator');
+    if (isBin(first) && first !== '-' && first !== '+') throw new Error('card: leading operator');
+    if (isBin(last)) throw new Error('card: trailing operator');
+    for (let i = 0; i + 1 < out.length; i++) {
+      const a = out[i] ?? '';
+      const b = out[i + 1] ?? '';
+      if (isBin(a) && (isBin(b) || isPost(b))) {
+        throw new Error('card: double operators in spoken input');
+      }
+      if (isPost(a) && isPost(b)) {
+        throw new Error('card: double operators in spoken input');
+      }
+    }
+  }
+  return out.join(' ');
+}
+
+// Func-prefix split derives from the runtime namespace (P2): sinx→sin(x),
+// log2x→log2(x). Longest-prefix scan so log2 wins over log. Case-folds
+// unicode/fullwidth capitals (SIN→sin). Kept because the tokenizer only sees
+// space-separated words — glued `sinx` never reaches it.
+function splitFuncPrefix(expr: string): string {
+  return expr.replace(/\b([A-Za-z][A-Za-z0-9]*)\b/g, (word) => {
+    if (isKnownFunc(word)) return word;
+    for (let len = word.length - 1; len >= 2; len--) {
+      const pre = word.slice(0, len);
+      const rest = word.slice(len);
+      if (!/^[A-Za-z0-9]+$/.test(rest) || rest.length === 0) continue;
+      if (isKnownFunc(pre)) return `${pre}(${rest})`;
+      if (isKnownFunc(pre.toLowerCase())) return `${pre.toLowerCase()}(${rest})`;
+    }
+    if (isKnownFunc(word.toLowerCase())) return word.toLowerCase();
     return word;
   });
 }
@@ -246,7 +575,7 @@ export function addImplicitMultiply(input: string): string {
   let s = splitFuncPrefix(input);
   // Word-space-word: alpha x→alpha*x; func-space-arg: sin x→sin(x).
   s = s.replace(/\b([a-zA-Z][a-zA-Z0-9]*)\s+([a-zA-Z][a-zA-Z0-9]*|\()/g, (_m: string, l: string, r: string) => {
-    if (isFunctionWord(l)) return r === '(' ? `${l} (` : `${l}(${r})`;
+    if (isFuncWord(l)) return r === '(' ? `${l} (` : `${l}(${r})`;
     if (r === '(') return `${l} (`;
     return `${l}*${r}`;
   });
@@ -267,12 +596,13 @@ export function addImplicitMultiply(input: string): string {
 
     const cur = chars[i] ?? '';
     const nxt = chars[i + 1] ?? '';
-    if (cur === ')' && nxt !== ')' && nxt !== ']' && nxt !== ',' && nxt !== ' ' && !'+-*/^'.includes(nxt)) {
+    // Comparison/logical tails never take implicit multiply: `)<=` stays.
+    if (cur === ')' && nxt !== ')' && nxt !== ']' && nxt !== ',' && nxt !== ' ' && !'+-*/^'.includes(nxt) && !'<>=!&|'.includes(nxt)) {
       out.push('*');
     }
 
     if (/\d/.test(cur) && nxt === '(') {
-      if (!isFunctionWord(wordAt(i))) out.push('*');
+      if (!isFuncWord(wordAt(i))) out.push('*');
     }
 
     if (/\d/.test(cur) && /[a-zA-Z]/.test(nxt)) {
@@ -280,15 +610,15 @@ export function addImplicitMultiply(input: string): string {
       for (let j = i + 1; j < chars.length && /[a-zA-Z]/.test(chars[j] ?? ''); j++) {
         word += chars[j];
       }
-      if (!isFunctionWord(word)) {
+      if (!isFuncWord(word)) {
         out.push('*');
       }
     }
 
-    // L4 letter↔digit: x2→x*2 (digit→letter above covers 2x). Exempt FUNC_NAMES
-    // (log2 stays) via whole-word check.
+    // L4 letter↔digit: x2→x*2 (digit→letter above covers 2x). Exempt known
+    // funcs (log2 stays) via runtime gate.
     if (/[a-zA-Z]/.test(cur) && /\d/.test(nxt)) {
-      if (!isFunctionWord(wordAt(i))) out.push('*');
+      if (!isFuncWord(wordAt(i))) out.push('*');
     }
 
     if (cur === ')' && /\d/.test(nxt)) {
@@ -300,7 +630,7 @@ export function addImplicitMultiply(input: string): string {
       let start = i;
       while (start > 0 && /[a-zA-Z]/.test(chars[start - 1] ?? '')) start--;
       for (let j = start; j <= i; j++) word += chars[j];
-      if (!isFunctionWord(word)) {
+      if (!isFuncWord(word)) {
         out.push('*');
       }
     }
@@ -309,15 +639,16 @@ export function addImplicitMultiply(input: string): string {
   return splitFuncPrefix(out.join(''));
 }
 
-// Mirror of plotMeta.hasXVar (same regexes) so side-select agrees with plotSide
-// without importing plotMeta. ponytail: 5-line dup beats a new module seam.
-const FUNC_CALL = /\\?\b(asin|acos|atan|sinh|cosh|tanh|sin|cos|tan|exp|log|ln|sqrt|cbrt|max|min|abs)\s*\(/g;
-
+// Side-select gate derives from the AST (P3): expand glued x (mx/2x/)x —
+// the one place the word tokenizer cannot reach — then free-symbols.
+// ponytail: 1-line expand dup avoids a mathParser↔plotMeta import cycle.
 function hasXVar(s: string): boolean {
-  const t = s.replace(FUNC_CALL, '(');
-  return (
-    /(^|[^A-Za-z0-9_)])x(?![A-Za-z0-9_(])/.test(t) || /[A-Za-z0-9)]x(?![A-Za-z0-9_(])/.test(t)
-  );
+  try {
+    const expanded = s.replace(/([A-Za-z0-9)])(x)(?![A-Za-z0-9_(])/g, '$1*$2');
+    return freeSymbols(parseExpr(expanded)).includes('x');
+  } catch {
+    return /(^|[^A-Za-z0-9])x(?![A-Za-z0-9])/.test(s);
+  }
 }
 
 const LEADING_STRIP = /^[a-zA-Z][a-zA-Z0-9]*(\([^)]*\))?\s*=\s*/;
@@ -332,6 +663,10 @@ export function normalizeWithMeta(input: string): { expr: string; assumptions: A
   if (!/\\begin\{/.test(input) && (/_\{[^}]+\}|_[A-Za-z0-9(]/.test(noLogBase))) {
     assumptions.push('subscript-dropped');
   }
+  // Bare trailing digits (y17) take the same subscript reading as X_{..} above.
+  if (/(?<![A-Za-z0-9])[A-Za-z]\d+(?![A-Za-z0-9])/.test(input) && !assumptions.includes('subscript-dropped')) {
+    assumptions.push('subscript-dropped');
+  }
 
   let s = input.trim().replace(LEADING_STRIP, '');
   s = stripLatex(s);
@@ -339,16 +674,13 @@ export function normalizeWithMeta(input: string): { expr: string; assumptions: A
   // mathjs bundle has log/log10/log2 but no ln alias: map standard ln(x) to log(x).
   s = s.replace(/\bln\s*\(/g, 'log(');
 
-  for (const [word, symbol] of Object.entries(WORD_MAP).sort((a, b) => b[0].length - a[0].length)) {
-    s = s.split(word).join(symbol);
-  }
+  s = spokenToMath(s);
 
   s = s.replace(/\^2/g, '^(2)');
   s = s.replace(/\^3/g, '^(3)');
   s = s.replace(/\s+\^/g, '^');
 
   s = addImplicitMultiply(s);
-  s = splitLetterPairs(s);
 
   // SIDE-SELECT: leftover top-level `=` (leading strip missed subscripted LHS
   // like x_{i+1}) → RHS-with-x first, else LHS — mirrors plotSide preference.
@@ -363,10 +695,20 @@ export function normalizeWithMeta(input: string): { expr: string; assumptions: A
   s = s.trim();
 
   // Free params → param-default iff textual defaults would change the expr.
-  // (defaultFreeParams lives in plotMeta to avoid a cycle; inline the same
-  // class here: singles minus x/y/e + greek minus pi/tau.)
-  if (/\b([a-df-wz])\b/.test(s) || /\b(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|rho|sigma|upsilon|phi|chi|psi|omega)\b/.test(s)) {
-    if (!assumptions.includes('param-default')) assumptions.push('param-default');
+  // Derived from the AST (P3): free symbols minus axes, singles + greek only
+  // so multi-letter typos still throw downstream instead of defaulting.
+  try {
+    const frees = freeSymbols(parseExpr(s));
+    const isParam = (sym: string): boolean => {
+      if (sym === 'x' || sym === 'y') return false;
+      if (/^[a-z]$/.test(sym)) return sym !== 'e';
+      return GREEK_NAMES.has(sym);
+    };
+    if (frees.some(isParam) && !assumptions.includes('param-default')) {
+      assumptions.push('param-default');
+    }
+  } catch {
+    // Unparsable here means compile will badge downstream — no assumption.
   }
 
   return { expr: s, assumptions };
@@ -384,9 +726,7 @@ export function normalizeInput(input: string): string {
   // mathjs bundle has log/log10/log2 but no ln alias: map standard ln(x) to log(x).
   s = s.replace(/\bln\s*\(/g, 'log(');
 
-  for (const [word, symbol] of Object.entries(WORD_MAP).sort((a, b) => b[0].length - a[0].length)) {
-    s = s.split(word).join(symbol);
-  }
+  s = spokenToMath(s);
 
   s = s.replace(/\^2/g, '^(2)');
   s = s.replace(/\^3/g, '^(3)');
@@ -432,6 +772,22 @@ export function registerCustomFunctions() {
 }
 
 registerCustomFunctions();
+
+// Compatibility alias for render files outside this task's ownership
+// (Plot2D inspectParts, RegionPlot stripFuncCalls). The hand-copied fork is
+// deleted: this set is derived from the runtime namespace via isKnownFunc,
+// so it can only diverge by failing the P-core equality test, never by edit.
+function computeFuncNames(): Set<string> {
+  const out = new Set<string>();
+  const rec = math as unknown as Record<string, unknown>;
+  for (const k of Object.keys(rec)) {
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(k)) continue;
+    if (isKnownFunc(k)) out.add(k);
+  }
+  return out;
+}
+
+export const FUNC_NAMES: ReadonlySet<string> = computeFuncNames();
 
 export { math };
 export type { MathJsStatic } from 'mathjs';
