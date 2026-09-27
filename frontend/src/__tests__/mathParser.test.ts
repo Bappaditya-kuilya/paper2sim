@@ -41,6 +41,18 @@ describe('stripLatex', () => {
   test('handles complex LaTeX', () => {
     expect(stripLatex('\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}')).toBe('(-b + sqrt(b^(2) - 4ac))/(2a)');
   });
+
+  test('unwraps $…$, \\(..\\) and \\[..\\] math delimiters', () => {
+    expect(stripLatex('$y = x^2$')).toBe('y = x^(2)');
+    expect(stripLatex('\\(y = x^2\\)')).toBe('y = x^(2)');
+    expect(stripLatex('\\[y = x^2\\]')).toBe('y = x^(2)');
+  });
+
+  test('unwraps unknown typography macros but cards bare ones', () => {
+    expect(stripLatex('$\\mathcal{F}(x) - \\ve{x}$')).toBe('F(x) - x');
+    expect(() => stripLatex('\\dmodel^{-0.5}')).toThrow('card: unknown LaTeX command \\dmodel');
+    expect(() => stripLatex('\\begin{bmatrix} 1 \\end{bmatrix}')).toThrow(/unknown LaTeX command/);
+  });
 });
 
 describe('addImplicitMultiply', () => {
@@ -112,6 +124,16 @@ describe('normalizeInput', () => {
 
   test('handles LaTeX frac', () => {
     expect(normalizeInput('\\frac{x}{y}')).toBe('(x)/(y)');
+  });
+
+  test('normalizes $…$ and \\(..\\) wrapped equations like the bare form', () => {
+    expect(normalizeInput('$y = x^2$')).toBe(normalizeInput('y = x^2'));
+    expect(normalizeInput('\\(y = x^2\\)')).toBe(normalizeInput('y = x^2'));
+    expect(normalizeInput('$y = x^2$')).toBe('x^(2)');
+  });
+
+  test('bare unknown macro cards with reason instead of shredding', () => {
+    expect(() => normalizeInput('lrate = \\dmodel^{-0.5}')).toThrow('card: unknown LaTeX command \\dmodel');
   });
 });
 

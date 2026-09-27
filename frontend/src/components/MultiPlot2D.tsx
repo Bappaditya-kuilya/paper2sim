@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { DEFAULT_SCOPE, sampleRow } from './Plot2D';
 import { isInequalityLatex } from './RegionPlot';
 import { DASH_CYCLE, type Row } from '../lib/expressionRows';
+import { unwrapEquationEnvs } from '../lib/mathParser';
 import type { Viewport } from '../lib/viewport';
 
 interface MultiPlot2DProps {
@@ -34,19 +35,27 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
   const yToPx = (y: number): number => PAD_T + (1 - (y - y0) / ySpan) * innerH;
 
   const paths: Array<{ id: string; color: string; d: string }> = [];
+  const reasons: string[] = [];
   for (const row of rows) {
     if (!row.visible) continue;
     // Regions stay App's job; matrices never compile — skip both silently.
-    if (row.latex.includes('\\begin') || isInequalityLatex(row.latex)) continue;
+    if (isInequalityLatex(row.latex)) continue;
+    // Equation envs unwrap (a scalar equation is not a matrix); matrix envs keep the silent skip.
+    const latex = unwrapEquationEnvs(row.latex);
+    if (latex.includes('\\begin')) continue;
     const scope: Record<string, number> = { ...DEFAULT_SCOPE };
     for (const [k, p] of Object.entries(row.params)) scope[k] = p.value;
     let pts: Array<[number, number]>;
     try {
-      pts = sampleRow(row.latex, viewport.x, scope, 200);
-    } catch {
+      pts = sampleRow(latex, viewport.x, scope, 200);
+    } catch (e) {
+      reasons.push(e instanceof Error ? e.message : String(e));
       continue;
     }
-    if (!pts.some(([, y]) => Number.isFinite(y))) continue;
+    if (!pts.some(([, y]) => Number.isFinite(y))) {
+      reasons.push(`no finite points on x∈[${fmt(x0)},${fmt(x1)}]`);
+      continue;
+    }
     let d = '';
     let prevFinite = false;
     let prevY = 0;
@@ -65,6 +74,8 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
   }
 
   if (paths.length === 0) {
+    // ponytail: first 3 distinct reasons, not one per row — upgrade path: per-row list keyed by label.
+    const shown = [...new Set(reasons)].slice(0, 3);
     return (
       <div
         role="img"
@@ -72,6 +83,9 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
         className="w-full rounded-lg border border-white/10 bg-black p-4"
       >
         <p className="text-sm tabular-nums text-[#D1D5DB]">No visible plots</p>
+        {shown.map((r) => (
+          <p key={r} className="mt-1 text-xs text-zinc-400">{r}</p>
+        ))}
       </div>
     );
   }

@@ -316,8 +316,36 @@ function unicodeHead(s: string): string {
   return s;
 }
 
+// L0: scalar equation envs (equation/align/gather/eqnarray/...) wrap the same
+// expression the typed form would; strip their markers plus the alignment tabs
+// `&` (layout, never math) so 2D, 3D and ParamSliders all normalize alike.
+// Matrix/structural envs (matrix, bmatrix, ..., array, cases, smallmatrix)
+// keep their markers — Plot2D classifies them, MultiPlot2D skips them.
+// aligned/split/gathered flatten too: they wrap scalar math, never data.
+// ponytail: `\\` row breaks stay in the body, so multi-line align cards with
+// the parse reason instead of silently plotting line 1 — upgrade path: one
+// path per line.
+export function unwrapEquationEnvs(s: string): string {
+  const bare = s.replace(
+    /\\(?:begin|end)\{(?:equation|alignat|align|aligned|gather|gathered|eqnarray|displaymath|multline|flalign|split)\*?\}/g,
+    '',
+  );
+  return bare === s ? s : bare.replace(/&/g, ' ');
+}
+
+// L0: $..$, \(..\) and \[..\] wrap the same expression the typed form would
+// carry; unwrap before the leading `Name =` strip so both normalize alike.
+function unwrapMathDelimiters(s: string): string {
+  return unwrapEquationEnvs(
+    s
+      .replace(/\\\[([\s\S]+?)\\\]/g, '$1')
+      .replace(/\\\(([\s\S]+?)\\\)/g, '$1')
+      .replace(/\$([^$]+)\$/g, '$1'),
+  );
+}
+
 export function stripLatex(input: string): string {
-  let s = unicodeHead(input.trim());
+  let s = unwrapMathDelimiters(unicodeHead(input.trim()));
   // L0: unescaped %.* comments; \% keeps a literal percent.
   s = s.replace(/(?<!\\)%.*/g, '');
   s = s.replace(/\\%/g, '%');
@@ -364,6 +392,13 @@ export function stripLatex(input: string): string {
     if (cmd === 'ln') return cmd;
     return m;
   });
+  // L2: typography macros unwrap to their braced group (a font/markup choice
+  // never changes the math); begin/end stay so environments card instead of
+  // becoming a stray word. Bare unknowns card below — never vanish, never
+  // invent a value for \dmodel.
+  s = s.replace(/\\([A-Za-z][A-Za-z0-9]*)\s*\{([A-Za-z0-9]+)\}/g, (m, cmd: string, grp: string) =>
+    cmd === 'begin' || cmd === 'end' ? m : grp,
+  );
   // L2: shredder deleted — unknown commands card with reason, never vanish.
   const unknown = s.match(/\\[A-Za-z][A-Za-z0-9]*/);
   if (unknown) throw new Error(`card: unknown LaTeX command ${unknown[0]}`);
@@ -668,7 +703,7 @@ export function normalizeWithMeta(input: string): { expr: string; assumptions: A
     assumptions.push('subscript-dropped');
   }
 
-  let s = input.trim().replace(LEADING_STRIP, '');
+  let s = unwrapMathDelimiters(input.trim()).replace(LEADING_STRIP, '');
   s = stripLatex(s);
 
   // mathjs bundle has log/log10/log2 but no ln alias: map standard ln(x) to log(x).
@@ -717,7 +752,7 @@ export function normalizeWithMeta(input: string): { expr: string; assumptions: A
 export function normalizeInput(input: string): string {
   const card = cardReason(input);
   if (card) throw new Error(card);
-  let s = input.trim();
+  let s = unwrapMathDelimiters(input.trim());
 
   s = s.replace(LEADING_STRIP, '');
 
