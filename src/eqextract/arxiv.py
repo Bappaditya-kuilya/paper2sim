@@ -23,6 +23,15 @@ MAX_PDF_TEXT_CHARS = 200 * 1024
 _CHUNK_SIZE = 64 * 1024
 
 
+class SourceTooLarge(ValueError):
+    """Response exceeded ``MAX_DOWNLOAD_BYTES`` — a normal condition, not a server fault."""
+
+
+def _canonical_id(arxiv_id: str) -> str:
+    """arXiv's endpoints are case-sensitive: legacy ids are canonical lowercase (hep-th/9901001)."""
+    return arxiv_id.lower()
+
+
 def parse_arxiv_url(url: str) -> str | None:
     """Extract arXiv ID from various URL formats.
 
@@ -30,12 +39,18 @@ def parse_arxiv_url(url: str) -> str | None:
     - https://arxiv.org/abs/2301.12345
     - https://arxiv.org/pdf/2301.12345
     - https://arxiv.org/pdf/2301.12345v2
+    - Legacy ID: math/0211159, HEP-TH/9901001, math.GT/0309136 (bare or abs/pdf URL)
     - Bare ID: 2301.12345
+
+    Returns the ID as typed; downstream fetches canonicalize case.
     """
     url = url.strip()
+    modern = r"\d{4}\.\d{4,5}(?:v\d+)?"
+    legacy = r"[A-Za-z-]+(?:\.[A-Za-z-]+)?/\d{7}(?:v\d+)?"
     patterns = [
-        r"arxiv\.org/(?:abs|pdf|html)/(\d{4}\.\d{4,5}(?:v\d+)?)",
-        r"^(\d{4}\.\d{4,5}(?:v\d+)?)$",
+        # (?!\d): URL form is unanchored — reject tails like .../abs/2301.123456
+        rf"arxiv\.org/(?:abs|pdf|html)/({modern}|{legacy})(?!\d)",
+        rf"^({modern}|{legacy})$",
     ]
     for pat in patterns:
         m = re.search(pat, url)
@@ -47,7 +62,7 @@ def parse_arxiv_url(url: str) -> str | None:
 def _read_url(url: str) -> tuple[bytes, str]:
     """GET a URL with timeout and size cap.
 
-    Returns (body, content-type). Raises ``ValueError("too_large")`` beyond
+    Returns (body, content-type). Raises ``SourceTooLarge`` beyond
     ``MAX_DOWNLOAD_BYTES``; network errors propagate as ``URLError``/``OSError``.
     """
     req = urllib.request.Request(url, headers={"User-Agent": "paper2sim/0.1"})
@@ -61,16 +76,20 @@ def _read_url(url: str) -> tuple[bytes, str]:
                 break
             total += len(part)
             if total > MAX_DOWNLOAD_BYTES:
-                raise ValueError("too_large")
+                raise SourceTooLarge("too_large")
             chunks.append(part)
     return b"".join(chunks), content_type
 
 
 def download_source(arxiv_id: str, dest_dir: str) -> Path | None:
-    """Download and extract the TeX source for an arXiv paper."""
+    """Download and extract the TeX source for an arXiv paper.
+
+    Returns ``None`` on any network failure; propagates ``SourceTooLarge``
+    so the caller can report the size cap instead of a generic outage.
+    """
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
-    url = f"https://arxiv.org/e-print/{arxiv_id}"
+    url = f"https://arxiv.org/e-print/{_canonical_id(arxiv_id)}"
     try:
         data, content_type = _read_url(url)
     except (urllib.error.URLError, OSError):
@@ -176,12 +195,16 @@ def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
 
 
 def get_paper_info(arxiv_id: str) -> dict | None:
-    """Fetch paper metadata from the arXiv Atom API."""
-    url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+    """Fetch paper metadata from the arXiv Atom API.
+
+    Best-effort: any fetch/parse failure (network, size cap, bad encoding)
+    returns ``None`` rather than raising.
+    """
+    url = f"https://export.arxiv.org/api/query?id_list={_canonical_id(arxiv_id)}"
     try:
         xml_bytes, _ = _read_url(url)
         xml_data = xml_bytes.decode("utf-8")
-    except (urllib.error.URLError, OSError):
+    except (urllib.error.URLError, OSError, ValueError):
         return None
 
     ns = {"atom": "http://www.w3.org/2005/Atom"}
@@ -204,7 +227,7 @@ def fetch_pdf_text(arxiv_id: str) -> str | None:
     Returns the text (capped), ``""`` when the PDF has zero text layer
     (scanned), or ``None`` when the fetch fails (network, >20MB, non-PDF).
     """
-    url = f"https://arxiv.org/pdf/{arxiv_id}"
+    url = f"https://arxiv.org/pdf/{_canonical_id(arxiv_id)}"
     req = urllib.request.Request(url, headers={"User-Agent": "paper2sim/0.1"})
     chunks: list[bytes] = []
     total = 0

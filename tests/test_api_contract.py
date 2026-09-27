@@ -54,6 +54,51 @@ def test_bad_arxiv_id_lookup_400_json():
     assert "detail" in r.json()
 
 
+def test_legacy_mixed_case_lookup_accepted(monkeypatch):
+    """HEP-TH/9901001 parses (was 400 invalid_id) and fetches with a canonical id."""
+    import eqextract
+
+    monkeypatch.setattr(eqextract, "download_source", lambda a, d: None)
+    monkeypatch.setattr(eqextract, "get_paper_info", lambda i: {"title": "T", "authors": [], "abstract": ""})
+    monkeypatch.setattr(eqextract, "fetch_pdf_text", lambda i: None, raising=False)
+    r = client.get("/api/arxiv", params={"url": "HEP-TH/9901001"})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "T"
+
+
+def test_arxiv_source_too_large_413(monkeypatch):
+    """SourceTooLarge is a normal condition → honest 413, not arxiv_unavailable 502."""
+    import eqextract
+    from eqextract.arxiv import SourceTooLarge
+
+    def too_large(arxiv_id_, dest):
+        raise SourceTooLarge("too_large")
+
+    monkeypatch.setattr(eqextract, "download_source", too_large)
+
+    r = client.get("/api/arxiv", params={"url": "2301.12345"})
+    assert r.status_code == 413
+    assert r.json() == {"detail": "paper source too large to fetch"}
+    assert "arxiv:2301.12345" not in api._cache  # no failure cached
+
+    r2 = client.post("/api/extract", json={"source": "arxiv_url", "value": "2301.12345"})
+    assert r2.status_code == 413
+    assert r2.json() == {"detail": "paper source too large to fetch"}
+
+
+def test_unexpected_fetch_error_still_502(monkeypatch):
+    """Genuine bugs must not be swallowed into 200/413."""
+    import eqextract
+
+    def boom(arxiv_id_, dest):
+        raise RuntimeError("real bug")
+
+    monkeypatch.setattr(eqextract, "download_source", boom)
+    r = client.get("/api/arxiv", params={"url": "2301.12346"})
+    assert r.status_code == 502
+    assert r.json() == {"detail": "arxiv_unavailable"}
+
+
 def test_cache_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setenv("CACHE_DB", str(tmp_path / "cache.db"))
     from eqextract import cache as cache_mod

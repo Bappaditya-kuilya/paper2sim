@@ -280,6 +280,9 @@ async def extract(req: ExtractRequest):
         return cached
     try:
         equations, _, warning = _fetch_arxiv(arxiv_id, mod)
+    except mod.arxiv.SourceTooLarge:
+        # 5MB source cap is client-actionable, not an upstream outage
+        raise HTTPException(status_code=413, detail="paper source too large to fetch")
     except Exception:
         logger.exception("arxiv extract failed")
         raise HTTPException(status_code=502, detail="arxiv_unavailable")
@@ -367,6 +370,9 @@ async def arxiv_lookup(url: str):
                 info = mod.get_paper_info(arxiv_id) or {}
             except Exception:
                 info = {}
+    except mod.arxiv.SourceTooLarge:
+        # 5MB source cap is client-actionable, not an upstream outage
+        raise HTTPException(status_code=413, detail="paper source too large to fetch")
     except Exception:
         logger.exception("arxiv lookup failed")
         raise HTTPException(status_code=502, detail="arxiv_unavailable")
