@@ -31,7 +31,15 @@ export async function checkBackend(): Promise<boolean> {
   for (let i = 0; i < HEALTH_TRIES; i++) {
     try {
       const res = await fetch(`${apiBase()}/health`, { method: 'GET', signal: AbortSignal.timeout(HEALTH_TIMEOUT) });
-      if (res.ok) { backendAvailable = true; return true; }
+      if (res.ok) {
+        // A 200 alone isn't enough: the dev server's SPA fallback serves
+        // index.html for unknown paths. Require the backend's {"status":"ok"}.
+        const data: unknown = await res.json();
+        if (typeof data === 'object' && data !== null && 'status' in data && data.status === 'ok') {
+          backendAvailable = true;
+          return true;
+        }
+      }
     } catch { /* backoff below */ }
     if (i < HEALTH_TRIES - 1) await new Promise(r => setTimeout(r, 2000 * (i + 1)));
   }
