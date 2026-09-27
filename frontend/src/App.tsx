@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { checkBackend, type Equation, type ExtractResponse } from './lib/extractApi';
 import { hintFor, showDimensionToggle } from './lib/plotMeta';
 import { PALETTE, duplicateRow, newRow, toggleRow, type Row } from './lib/expressionRows';
@@ -8,8 +8,10 @@ import { ExpressionList } from './components/ExpressionList';
 import { MultiPlot2D } from './components/MultiPlot2D';
 import { ParamSliders } from './components/ParamSliders';
 import { centerRangeOn, findJumpTarget, isInequalityLatex, RegionPlot } from './components/RegionPlot';
-import { Viewer3D } from './components/Viewer3D';
 import { ParamPanel } from './components/ParamPanel';
+
+// three.js + @react-three only load when the user toggles to 3D.
+const Viewer3D = lazy(() => import('./components/Viewer3D').then((m) => ({ default: m.Viewer3D })));
 import {
   DEFAULT_VIEWER_PARAMS,
   type ParamPatch,
@@ -385,15 +387,23 @@ export default function App() {
                         </div>
                         {viewMode === '3d' && (
                           <>
-                            <Viewer3D
-                              latex={selectedLatex}
-                              xRange={params.xRange}
-                              yRange={params.yRange}
-                              resolution={params.resolution}
-                              showGrid={params.showGrid}
-                              showAxes={params.showAxes}
-                              wireframe={params.wireframe}
-                            />
+                            <Suspense
+                              fallback={
+                                <div role="status" className="flex h-[280px] w-full items-center justify-center rounded-lg border border-white/10 bg-black text-sm text-gray-300 md:h-[400px]">
+                                  Loading 3D…
+                                </div>
+                              }
+                            >
+                              <Viewer3D
+                                latex={selectedLatex}
+                                xRange={params.xRange}
+                                yRange={params.yRange}
+                                resolution={params.resolution}
+                                showGrid={params.showGrid}
+                                showAxes={params.showAxes}
+                                wireframe={params.wireframe}
+                              />
+                            </Suspense>
                             <ParamPanel {...params} onChange={handleParams} />
                           </>
                         )}
