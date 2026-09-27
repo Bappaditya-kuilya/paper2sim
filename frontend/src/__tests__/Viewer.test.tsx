@@ -84,15 +84,15 @@ describe('Plot2D (2D cases)', () => {
 });
 
 describe('Viewer 3D toggle', () => {
-  test('toggle mounts viewer for function type, 2D default', () => {
+  test('toggle mounts viewer for function type, 2D default', async () => {
     const { container } = render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
     expect(screen.getByRole('radiogroup', { name: 'Plot dimension' })).toBeDefined();
     expect(container.querySelector('svg')).not.toBeNull();
     expect(screen.queryByTestId('viewer-3d')).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: '3D' }));
-    expect(screen.getByTestId('viewer-3d')).toBeDefined();
-    expect(screen.getByTestId('mock-canvas')).toBeDefined();
+    expect(await screen.findByTestId('viewer-3d')).toBeDefined();
+    expect(await screen.findByTestId('mock-canvas')).toBeDefined();
   });
 
   test('no toggle for unknown type', async () => {
@@ -370,6 +370,25 @@ describe('F5 Viewer3D CARD', () => {
     );
     expect(screen.getByText('No 3D view for this type')).toBeDefined();
     expect(screen.getByText(cardLatex)).toBeDefined();
+  });
+
+  test.each([
+    ['\\begin{equation} y = x^2 \\end{equation}'],
+    ['\\begin{align} y &= x^2 \\end{align}'],
+  ])('%s renders the 3D canvas, not the rejection card', (latex) => {
+    render(
+      <Viewer3D
+        latex={latex}
+        xRange={[-10, 10]}
+        yRange={[-10, 10]}
+        resolution={32}
+        showGrid
+        showAxes
+        wireframe={false}
+      />,
+    );
+    expect(screen.getByTestId('viewer-3d')).toBeDefined();
+    expect(screen.queryByText('No 3D view for this type')).toBeNull();
   });
 });
 
