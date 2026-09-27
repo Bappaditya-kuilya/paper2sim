@@ -188,7 +188,7 @@ export default function App() {
   }, []);
 
   const selectedRow = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
-  const selectedType = selectedRow ? (rowTypes[selectedRow.id] ?? (selectedRow.latex.includes('\\begin') ? 'matrix' : '')) : '';
+  const selectedType = selectedRow ? (rowTypes[selectedRow.id] ?? '') : '';
   const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${rows.length} equations${title ? ` — ${title}` : ''}` : ''));
   const showZero = attempted && !busy && rows.length === 0;
   const selectedLatex = selectedRow ? selectedRow.latex : '';
@@ -264,6 +264,7 @@ export default function App() {
         <InputTabs
           onResult={handleResult}
           onInlineError={handleInlineError}
+          onTabChange={() => setNotice(null)}
           busy={busy}
           onBusy={setBusy}
           defaultSample={handleSample}
@@ -299,10 +300,8 @@ export default function App() {
             </div>
           ) : (
             <>
-              {rows.length > 0 && (
-                <p className="min-w-0 text-sm tabular-nums text-gray-300 md:col-span-2">
-                  {cause ?? `${rows.length} equations${title ? ` — ${title}` : ''}`}
-                </p>
+              {rows.length > 0 && cause && (
+                <p className="min-w-0 text-sm tabular-nums text-gray-300 md:col-span-2">{cause}</p>
               )}
               <ExpressionList
                 rows={rows}
