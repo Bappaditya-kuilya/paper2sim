@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { extractArxiv, extractText, extractUpload, type ExtractResponse } from '../lib/extractApi';
 
 type TabId = 'equation' | 'arxiv' | 'pdf';
@@ -6,6 +6,7 @@ type TabId = 'equation' | 'arxiv' | 'pdf';
 interface InputTabsProps {
   onResult(r: ExtractResponse, title: string): void;
   onInlineError(msg: string): void;
+  onTabChange(): void;
   busy: boolean;
   onBusy(b: boolean): void;
   defaultSample(): void;
@@ -23,15 +24,22 @@ const HINTS: Record<TabId, string> = {
   pdf: 'Choose a PDF first.',
 };
 
-export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample }: InputTabsProps) {
+export function InputTabs({ onResult, onInlineError, onTabChange, busy, onBusy, defaultSample }: InputTabsProps) {
   const [tab, setTab] = useState<TabId>('equation');
   const [eqText, setEqText] = useState('');
   const [arxiv, setArxiv] = useState('');
   const [pdf, setPdf] = useState<File | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
   const valid =
     tab === 'equation' ? eqText.trim().length > 0 : tab === 'arxiv' ? arxiv.trim().length > 0 : pdf !== null;
+
+  function selectTab(id: TabId) {
+    setTab(id);
+    setInlineError(null);
+    onTabChange();
+  }
 
   function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -40,7 +48,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
     const next = e.key === 'ArrowRight' ? (i + 1) % TABS.length : (i - 1 + TABS.length) % TABS.length;
     const id = TABS[next]?.id;
     if (id) {
-      setTab(id);
+      selectTab(id);
       document.getElementById(`inputtabs-tab-${id}`)?.focus();
     }
   }
@@ -91,10 +99,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
             role="tab"
             aria-selected={tab === t.id}
             aria-controls={`inputtabs-panel-${t.id}`}
-            onClick={() => {
-              setTab(t.id);
-              setInlineError(null);
-            }}
+            onClick={() => selectTab(t.id)}
             onKeyDown={onTabKeyDown}
             className={`min-h-[44px] flex-1 rounded-full px-3 py-2 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
               tab === t.id ? 'bg-white/10 text-white' : 'text-gray-300 hover:text-white'
@@ -137,6 +142,7 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
         <div id="inputtabs-panel-pdf" role="tabpanel" aria-labelledby="inputtabs-tab-pdf">
           <input
             id="inputtabs-field"
+            ref={pdfInputRef}
             type="file"
             accept=".pdf"
             aria-label="Upload PDF"
@@ -148,7 +154,10 @@ export function InputTabs({ onResult, onInlineError, busy, onBusy, defaultSample
               <span className="truncate">{pdf.name}</span>
               <button
                 type="button"
-                onClick={() => setPdf(null)}
+                onClick={() => {
+                  setPdf(null);
+                  if (pdfInputRef.current) pdfInputRef.current.value = '';
+                }}
                 className="min-h-[44px] min-w-[44px] rounded-full border border-white/20 px-3 text-sm text-white transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[.98]"
               >
                 Remove
