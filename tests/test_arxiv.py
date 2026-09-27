@@ -42,6 +42,88 @@ def test_url_forms():
     assert arxiv_mod.parse_arxiv_url("not-an-id") is None
 
 
+def test_legacy_url_forms():
+    assert arxiv_mod.parse_arxiv_url("math/0211159") == "math/0211159"
+    assert arxiv_mod.parse_arxiv_url("https://arxiv.org/abs/math/0211159") == "math/0211159"
+    assert arxiv_mod.parse_arxiv_url("hep-th/9901001v2") == "hep-th/9901001"  # version stripped
+    assert arxiv_mod.parse_arxiv_url("math.CO/0309136") == "math.CO/0309136"
+    assert arxiv_mod.parse_arxiv_url("math/02111599") is None  # 8 digits, not legacy
+    assert arxiv_mod.parse_arxiv_url("math/02111") is None
+    assert arxiv_mod.parse_arxiv_url("not-a-real-id") is None
+
+
+def test_legacy_mixed_case_and_garbage():
+    """Legacy archive codes are case-insensitive; numeric-tail garbage stays rejected."""
+    assert arxiv_mod.parse_arxiv_url("HEP-TH/9901001") == "HEP-TH/9901001"
+    assert arxiv_mod.parse_arxiv_url("hep-th/9901001") == "hep-th/9901001"
+    assert arxiv_mod.parse_arxiv_url("HEP-TH/9901001v2") == "HEP-TH/9901001"
+    assert arxiv_mod.parse_arxiv_url("math.GT/0309136") == "math.GT/0309136"
+    assert arxiv_mod.parse_arxiv_url("math.gt/0309136") == "math.gt/0309136"
+    assert arxiv_mod.parse_arxiv_url("physics.pop-ph/0210017") == "physics.pop-ph/0210017"
+    assert arxiv_mod.parse_arxiv_url("https://arxiv.org/abs/HEP-TH/9901001") == "HEP-TH/9901001"
+
+    assert arxiv_mod.parse_arxiv_url("not-a-real-id") is None
+    assert arxiv_mod.parse_arxiv_url("math/02111") is None  # 6-digit tail
+    assert arxiv_mod.parse_arxiv_url("math/02111599") is None  # 8-digit tail
+    assert arxiv_mod.parse_arxiv_url("1234567") is None
+    assert arxiv_mod.parse_arxiv_url("https://arxiv.org/abs/2301.123456") is None  # 6-digit tail
+    assert arxiv_mod.parse_arxiv_url("https://example.com/foo") is None
+
+
+def test_legacy_id_builds_fetch_urls(monkeypatch):
+    seen: list[str] = []
+    monkeypatch.setattr(
+        arxiv_mod,
+        "_read_url",
+        lambda url: (seen.append(url) or (ATOM_OK, "application/atom+xml")),
+    )
+    arxiv_mod.get_paper_info("math/0211159")
+    assert seen == ["https://export.arxiv.org/api/query?id_list=math/0211159"]
+
+
+def test_mixed_case_id_canonicalized_downstream(monkeypatch, tmp_path):
+    """HEP-TH/9901001 must reach arXiv as hep-th/9901001 — the Atom API is case-sensitive."""
+    seen: list[str] = []
+    monkeypatch.setattr(
+        arxiv_mod,
+        "_read_url",
+        lambda url: (seen.append(url) or (ATOM_OK, "application/atom+xml")),
+    )
+    arxiv_mod.get_paper_info("HEP-TH/9901001")
+    monkeypatch.setattr(
+        arxiv_mod,
+        "_read_url",
+        lambda url: (seen.append(url) or (b"\\begin{document}x\\end{document}", "text/plain")),
+    )
+    arxiv_mod.download_source("HEP-TH/9901001", str(tmp_path))
+    assert seen == [
+        "https://export.arxiv.org/api/query?id_list=hep-th/9901001",
+        "https://arxiv.org/e-print/hep-th/9901001",
+    ]
+
+    class FakeResp:
+        headers = {}
+
+        def read(self, n=-1):
+            return b""
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    captured: list[str] = []
+
+    def fake_urlopen(req, timeout=None):
+        captured.append(req.full_url)
+        return FakeResp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    arxiv_mod.fetch_pdf_text("HEP-TH/9901001")
+    assert captured == ["https://arxiv.org/pdf/hep-th/9901001"]
+
+
 def test_timeout_is_15s(monkeypatch):
     seen = {}
 
@@ -87,6 +169,27 @@ def test_over_5mb_raises_too_large(monkeypatch):
         assert False, "expected ValueError"
     except ValueError as e:
         assert str(e) == "too_large"
+
+
+def test_download_source_propagates_too_large(monkeypatch, tmp_path):
+    """Source escape hatch: the size cap must reach the API (→413), not be swallowed here."""
+
+    def boom(url):
+        raise arxiv_mod.SourceTooLarge("too_large")
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", boom)
+    with pytest.raises(arxiv_mod.SourceTooLarge):
+        arxiv_mod.download_source("2301.12345", str(tmp_path))
+
+
+def test_get_paper_info_too_large_returns_none(monkeypatch):
+    """Metadata is best-effort: size cap degrades to None, never escapes as a 5xx."""
+
+    def boom(url):
+        raise arxiv_mod.SourceTooLarge("too_large")
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", boom)
+    assert arxiv_mod.get_paper_info("2301.12345") is None
 
 
 def test_get_paper_info_mocked_200(monkeypatch):
