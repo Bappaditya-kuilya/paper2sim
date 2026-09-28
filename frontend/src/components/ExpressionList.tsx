@@ -47,9 +47,13 @@ function RowItem({
         aria-label={`Select ${row.latex}`}
         aria-pressed={selected}
         onClick={() => onSelect(row.id)}
-        style={{ backgroundColor: row.color }}
-        className="h-4 w-4 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-      />
+        className="group -my-3.5 -ml-3.5 -mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none"
+      >
+        <span
+          className="h-4 w-4 rounded-full group-focus-visible:ring-2 group-focus-visible:ring-white"
+          style={{ backgroundColor: row.color }}
+        />
+      </button>
       <input
         aria-label="Equation"
         value={draft}
@@ -58,7 +62,7 @@ function RowItem({
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         }}
-        className="min-w-0 flex-1 bg-transparent font-mono text-sm tabular-nums text-zinc-100 outline-none"
+        className="min-h-[44px] min-w-0 flex-1 bg-transparent font-mono text-sm tabular-nums text-zinc-100 outline-none sm:min-h-0"
       />
       <button
         type="button"

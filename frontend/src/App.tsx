@@ -2,6 +2,7 @@ import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, ty
 import { checkBackend, type Equation, type ExtractResponse } from './lib/extractApi';
 import { hintFor, showDimensionToggle } from './lib/plotMeta';
 import { PALETTE, duplicateRow, newRow, toggleRow, type Row } from './lib/expressionRows';
+import { classifyExpression } from './lib/mathParser';
 import { DEFAULT_VIEWPORT, panViewport, zoomViewport, type Viewport } from './lib/viewport';
 import { InputTabs } from './components/InputTabs';
 import { ExpressionList } from './components/ExpressionList';
@@ -169,6 +170,9 @@ export default function App() {
 
   const handleEdit = useCallback((id: string, latex: string) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, latex } : r)));
+    // Re-derive on edit: rowTypes is backend-only, so the badge/hint go stale.
+    // ponytail: client classifier can drift from the backend label; upgrade path: refetch the type on blur.
+    setRowTypes((prev) => ({ ...prev, [id]: classifyExpression(latex) }));
   }, []);
 
   const handleParamSliders = useCallback((id: string, patch: Row['params']) => {
@@ -191,7 +195,7 @@ export default function App() {
 
   const selectedRow = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
   const selectedType = selectedRow ? (rowTypes[selectedRow.id] ?? '') : '';
-  const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${rows.length} equations${title ? ` — ${title}` : ''}` : ''));
+  const status = busy ? 'Extracting…' : (notice ?? (attempted ? `${rows.length} ${rows.length === 1 ? 'equation' : 'equations'}${title ? ` — ${title}` : ''}` : ''));
   const showZero = attempted && !busy && rows.length === 0;
   const selectedLatex = selectedRow ? selectedRow.latex : '';
   const regionRow = rows.find((r) => r.visible && isInequalityLatex(r.latex)) ?? null;
