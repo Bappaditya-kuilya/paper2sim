@@ -21,6 +21,7 @@ MAX_PDF_BYTES = 20 * 1024 * 1024
 MAX_PDF_PAGES = 50
 MAX_PDF_TEXT_CHARS = 200 * 1024
 _CHUNK_SIZE = 64 * 1024
+_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
 
 class SourceTooLarge(ValueError):
@@ -194,31 +195,49 @@ def _save_plain_tex(data: bytes, dest: Path) -> Path | None:
     return out
 
 
+def _atom_query(arxiv_id: str) -> ET.Element:
+    """GET the ``id_list`` Atom feed. Raises on any fetch/parse failure."""
+    url = f"https://export.arxiv.org/api/query?id_list={_canonical_id(arxiv_id)}"
+    xml_bytes, _ = _read_url(url)
+    return ET.fromstring(xml_bytes.decode("utf-8"))
+
+
 def get_paper_info(arxiv_id: str) -> dict | None:
     """Fetch paper metadata from the arXiv Atom API.
 
     Best-effort: any fetch/parse failure (network, size cap, bad encoding)
     returns ``None`` rather than raising.
     """
-    url = f"https://export.arxiv.org/api/query?id_list={_canonical_id(arxiv_id)}"
     try:
-        xml_bytes, _ = _read_url(url)
-        xml_data = xml_bytes.decode("utf-8")
-    except (urllib.error.URLError, OSError, ValueError):
+        root = _atom_query(arxiv_id)
+    except (urllib.error.URLError, OSError, ValueError, ET.ParseError):
         return None
+    entry = root.find("atom:entry", _NS)
+    if entry is None:
+        return None
+    title = entry.findtext("atom:title", "", _NS).strip().replace("\n", " ")
+    abstract = entry.findtext("atom:summary", "", _NS).strip().replace("\n", " ")
+    authors = [a.findtext("atom:name", "", _NS) for a in entry.findall("atom:author", _NS)]
+    return {"title": title, "authors": authors, "abstract": abstract}
 
-    ns = {"atom": "http://www.w3.org/2005/Atom"}
+
+def atom_has_entry(arxiv_id: str) -> bool | None:
+    """Verdict from the id_list query: True/False from a parsed feed, None if unanswerable.
+
+    A parsed feed carries an entry for every id arXiv knows — zero entries, or
+    arXiv's HTTP 400 for a malformed id, mean the id does not exist. Anything
+    else (network, 5xx, parse) is not a verdict. Atom only knows subject-
+    qualified legacy ids in bare-archive form (math.GT/0309136 → math/0309136),
+    so the query drops the qualifier the way arXiv's abs pages do.
+    """
+    bare = re.sub(r"^([A-Za-z-]+)\.[A-Za-z-]+/", r"\1/", arxiv_id)
     try:
-        root = ET.fromstring(xml_data)
-        entry = root.find("atom:entry", ns)
-        if entry is None:
-            return None
-        title = entry.findtext("atom:title", "", ns).strip().replace("\n", " ")
-        abstract = entry.findtext("atom:summary", "", ns).strip().replace("\n", " ")
-        authors = [a.findtext("atom:name", "", ns) for a in entry.findall("atom:author", ns)]
-        return {"title": title, "authors": authors, "abstract": abstract}
-    except ET.ParseError:
+        root = _atom_query(bare)
+    except urllib.error.HTTPError as e:
+        return False if e.code == 400 else None
+    except (urllib.error.URLError, OSError, ValueError, ET.ParseError):
         return None
+    return root.find("atom:entry", _NS) is not None
 
 
 def fetch_pdf_text(arxiv_id: str) -> str | None:

@@ -272,7 +272,7 @@ def test_abstract_fallback_filters_prose_and_warns(monkeypatch):
     assert not any("improves over baselines" in e["latex"] for e in eqs)
     assert not any("wandering null geodesic" in e["latex"] for e in eqs)
     assert not any("alpha and beta are parameters" in e["latex"] for e in eqs)
-    assert re.match(r"^\d+ equations from abstract only", body.get("warning", ""))
+    assert re.match(r"^\d+ equations? from abstract only", body.get("warning", ""))
 
 
 def test_ladder_tex_beats_pdf_beats_abstract():
@@ -379,7 +379,7 @@ def test_ladder_pdf_failure_falls_back_to_abstract_verbatim():
 
         eqs, _, warning = api_mod._fetch_arxiv("2309.01004", Mod())
         assert any("E = mc^2 + x" in e["latex"] for e in eqs)
-        assert re.match(r"^\d+ equations from abstract only", warning or "")
+        assert re.match(r"^\d+ equations? from abstract only", warning or "")
     finally:
         if orig is None:
             try:
@@ -397,3 +397,122 @@ def test_prefilter_unicode_blocks_accepted():
     for line in ["⌊x⌋ + 1 = 2\n", "⌈y⌉ = 3\n", "a − b = c\n", "Α + Β = Γ\n"]:
         eqs = eqextract.extract_equations_from_text(line)
         assert any(line.strip() in e["latex"] for e in eqs), line
+
+
+def test_ascii_inequality_extracts():
+    """BUG1: typed ASCII `<`/`<=` lines reach classify_equation as inequalities."""
+    for value in ("y < x + 1", "x^2 + y^2 < 4", "y <= x + 1", "2 < 3"):
+        r = client.post("/api/extract", json={"source": "text", "value": value})
+        assert r.status_code == 200
+        eqs = r.json()["equations"]
+        assert eqs, value
+        assert any(e["latex"] == value and e["type"] == "inequality" for e in eqs), (value, eqs)
+
+
+def test_unicode_math_extracts():
+    """BUG2: `·`/`²`/`³`/`×` are math, not foreign mojibake."""
+    for value in ("y = π·x²", "y = x²", "y = x·2", "y = a × b"):
+        r = client.post("/api/extract", json={"source": "text", "value": value})
+        assert r.status_code == 200
+        eqs = r.json()["equations"]
+        assert eqs and any(e["latex"] == value for e in eqs), value
+
+
+def test_bare_ident_equals_extracts():
+    """BUG6: `y = x` has no operator — ident=ident must pass the text gate as function_def."""
+    r = client.post("/api/extract", json={"source": "text", "value": "y = x"})
+    assert r.status_code == 200
+    eqs = r.json()["equations"]
+    assert len(eqs) == 1
+    assert eqs[0]["latex"] == "y = x"
+    assert eqs[0]["type"] == "function_def"
+
+
+def test_prose_equals_forms_still_rejected():
+    """BUG6 guard: digits/spaces beside `=` and full sentences stay out of the ident=ident rule."""
+    for value in ("speed = 100 mph", "assume that y = x holds for all time", "the quick brown fox jumps over the lazy dog"):
+        r = client.post("/api/extract", json={"source": "text", "value": value})
+        assert r.status_code == 200
+        assert r.json() == {"equations": []}, value
+
+
+def test_operator_equals_regression_still_extracts():
+    """`y = x + 1` keeps extracting through the pre-existing operator rule."""
+    r = client.post("/api/extract", json={"source": "text", "value": "y = x + 1"})
+    assert r.status_code == 200
+    eqs = r.json()["equations"]
+    assert len(eqs) == 1
+    assert eqs[0]["latex"] == "y = x + 1"
+
+
+def test_prose_with_angle_brackets_still_rejected():
+    """BUG1 guard: markup/code prose must not ride the new `<` anchor."""
+    for value in ("<html> tags</html>", "<div>text</div>", "<h1>title</h1>", "for i < n; print value", "for i < n; print the value", "the quick brown fox jumps over the lazy dog"):
+        r = client.post("/api/extract", json={"source": "text", "value": value})
+        assert r.status_code == 200
+        assert r.json() == {"equations": []}, value
+
+
+def test_empty_text_returns_zero_equations():
+    for value in ("", "   \n  "):
+        r = client.post("/api/extract", json={"source": "text", "value": value})
+        assert r.status_code == 200
+        assert r.json() == {"equations": []}
+
+
+def test_arxiv_cache_key_canonicalized(monkeypatch, tmp_path):
+    """BUG4: HEP-TH/9901001 and hep-th/9901001 share one cache row."""
+    monkeypatch.setenv("CACHE_DB", str(tmp_path / "cache.db"))
+    import eqextract
+
+    monkeypatch.setattr(eqextract, "download_source", lambda a, d: None)
+    monkeypatch.setattr(eqextract, "get_paper_info", lambda i: {"title": "T", "authors": [], "abstract": ""})
+    monkeypatch.setattr(eqextract, "fetch_pdf_text", lambda i: None, raising=False)
+    r = client.get("/api/arxiv", params={"url": "HEP-TH/9901001"})
+    assert r.status_code == 200
+
+    from eqextract import cache as cache_mod
+
+    assert cache_mod.cache_get("arxiv:hep-th/9901001", 86400) is not None
+    assert cache_mod.cache_get("arxiv:HEP-TH/9901001", 86400) is None
+
+    def boom(*_a, **_k):
+        raise AssertionError("fetch must not run on cache hit")
+
+    monkeypatch.setattr(eqextract, "download_source", boom)
+    r2 = client.get("/api/arxiv", params={"url": "hep-th/9901001"})
+    assert r2.status_code == 200
+    assert r2.json() == r.json()
+
+
+def test_title_fallback_is_canonical_id(monkeypatch, tmp_path):
+    """BUG4: empty-info title fallback carries the lowercase id, not the raw casing."""
+    monkeypatch.setenv("CACHE_DB", str(tmp_path / "cache.db"))
+    import eqextract
+
+    monkeypatch.setattr(eqextract, "download_source", lambda a, d: None)
+    monkeypatch.setattr(eqextract, "get_paper_info", lambda i: None)
+    monkeypatch.setattr(eqextract, "fetch_pdf_text", lambda i: None, raising=False)
+    monkeypatch.setattr(eqextract.arxiv, "atom_has_entry", lambda i: None)  # outage: no verdict
+    r = client.get("/api/arxiv", params={"url": "HEP-TH/9901001"})
+    assert r.status_code == 200
+    assert r.json()["title"] == "hep-th/9901001"
+
+
+def test_abstract_warning_pluralizes(monkeypatch):
+    """BUG5: one abstract row reads '1 equation from abstract only', never '1 equations'."""
+    import eqextract
+
+    monkeypatch.setattr(eqextract, "download_source", lambda a, d: None)
+    monkeypatch.setattr(eqextract, "fetch_pdf_text", lambda i: None, raising=False)
+    summary = {"text": "E = mc^2 + x\n"}
+    monkeypatch.setattr(eqextract, "get_paper_info", lambda i: {"title": "T", "authors": [], "summary": summary["text"]})
+
+    r = client.post("/api/extract", json={"source": "arxiv_url", "value": "2309.99991"})
+    assert r.status_code == 200
+    assert r.json()["warning"] == "1 equation from abstract only — full text unavailable."
+
+    summary["text"] = "E = mc^2 + x\ny = mx + b\n"
+    r2 = client.post("/api/extract", json={"source": "arxiv_url", "value": "2309.99992"})
+    assert r2.status_code == 200
+    assert r2.json()["warning"] == "2 equations from abstract only — full text unavailable."

@@ -181,6 +181,11 @@ def _fetch_arxiv(arxiv_id: str, mod) -> tuple[list[dict], dict, str | None]:
                 return eqs[:MAX_EQUATIONS], info, f"Showing first {MAX_EQUATIONS} of {len(eqs)} — refine input to narrow."
             return eqs, info, None
         info = mod.get_paper_info(arxiv_id) or {}
+        if not info and mod.arxiv.atom_has_entry(arxiv_id) is False:
+            # Atom answered the id_list query with "no such id" — an invalid id,
+            # not a paper without equations. None (query failure) is no verdict:
+            # outages keep their existing status.
+            raise HTTPException(status_code=400, detail="invalid_id")
         # pdf-text ladder: tex missed → PDF text → abstract fallback on failure.
         pdf_text: str | None = None
         try:
@@ -220,7 +225,20 @@ def _fetch_arxiv(arxiv_id: str, mod) -> tuple[list[dict], dict, str | None]:
         eqs = [e for e in eqs if mod.equations.is_plottable_candidate(e.get("latex", ""))]
         if len(eqs) > MAX_EQUATIONS:
             return eqs[:MAX_EQUATIONS], info, f"Showing first {MAX_EQUATIONS} of {len(eqs)} — refine input to narrow."
-        return eqs, info, f"{len(eqs)} equations from abstract only — full text unavailable."
+        return eqs, info, f"{len(eqs)} equation{'s' if len(eqs) != 1 else ''} from abstract only — full text unavailable."
+
+
+def _fetch_arxiv_safe(arxiv_id: str, mod, ctx: str) -> tuple[list[dict], dict, str | None]:
+    """413 for the size cap (client-actionable, not an upstream outage), 502 for anything else."""
+    try:
+        return _fetch_arxiv(arxiv_id, mod)
+    except HTTPException:
+        raise
+    except mod.arxiv.SourceTooLarge:
+        raise HTTPException(status_code=413, detail="paper source too large to fetch")
+    except Exception:
+        logger.exception(ctx)
+        raise HTTPException(status_code=502, detail="arxiv_unavailable")
 
 
 @app.get("/")
@@ -275,17 +293,11 @@ async def extract(req: ExtractRequest):
         arxiv_id = None
     if not arxiv_id:
         raise HTTPException(status_code=400, detail="invalid_id")
+    arxiv_id = arxiv_id.lower()  # canonical (arxiv._canonical_id): one cache key + title per id
     cached = _json_get(f"arxiv:{arxiv_id}", _ARXIV_TTL)
     if cached is not None:
         return cached
-    try:
-        equations, _, warning = _fetch_arxiv(arxiv_id, mod)
-    except mod.arxiv.SourceTooLarge:
-        # 5MB source cap is client-actionable, not an upstream outage
-        raise HTTPException(status_code=413, detail="paper source too large to fetch")
-    except Exception:
-        logger.exception("arxiv extract failed")
-        raise HTTPException(status_code=502, detail="arxiv_unavailable")
+    equations, _, warning = _fetch_arxiv_safe(arxiv_id, mod, "arxiv extract failed")
     resp: dict = {"equations": equations}
     if warning:
         resp["warning"] = warning
@@ -360,22 +372,16 @@ async def arxiv_lookup(url: str):
         arxiv_id = None
     if not arxiv_id:
         raise HTTPException(status_code=400, detail="invalid_id")
+    arxiv_id = arxiv_id.lower()  # canonical (arxiv._canonical_id): one cache key + title per id
     cached = _json_get(f"arxiv:{arxiv_id}", _ARXIV_TTL)
     if cached is not None:
         return cached
-    try:
-        equations, info, _ = _fetch_arxiv(arxiv_id, mod)
-        if not info:
-            try:
-                info = mod.get_paper_info(arxiv_id) or {}
-            except Exception:
-                info = {}
-    except mod.arxiv.SourceTooLarge:
-        # 5MB source cap is client-actionable, not an upstream outage
-        raise HTTPException(status_code=413, detail="paper source too large to fetch")
-    except Exception:
-        logger.exception("arxiv lookup failed")
-        raise HTTPException(status_code=502, detail="arxiv_unavailable")
+    equations, info, _ = _fetch_arxiv_safe(arxiv_id, mod, "arxiv lookup failed")
+    if not info:
+        try:
+            info = mod.get_paper_info(arxiv_id) or {}
+        except Exception:
+            info = {}
     authors = info.get("authors") or []
     if authors and isinstance(authors[0], dict):
         authors = [a.get("name", "") for a in authors]

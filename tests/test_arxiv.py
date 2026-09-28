@@ -254,7 +254,7 @@ def test_failures_never_cached(monkeypatch):
     assert r.json()["equations"], "retry after failure must succeed (nothing stale cached)"
 
 
-import gzip as _gzip
+import gzip as _gzip  # noqa: E402
 
 
 def test_download_source_gzipped_single_tex(monkeypatch, tmp_path):
@@ -364,3 +364,73 @@ def test_fetch_pdf_text_failure_returns_none(monkeypatch):
 
     monkeypatch.setattr(urllib.request, "urlopen", boom)
     assert arxiv_mod.fetch_pdf_text("2301.12345") is None
+
+
+def test_atom_has_entry_verdicts(monkeypatch):
+    """BUG3: the probe separates 'arXiv does not know this id' from 'query failed'."""
+    monkeypatch.setattr(arxiv_mod, "_read_url", lambda url: (ATOM_OK, "application/atom+xml"))
+    assert arxiv_mod.atom_has_entry("2301.12345") is True
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", lambda url: (ATOM_EMPTY, "application/atom+xml"))
+    assert arxiv_mod.atom_has_entry("foo-bar/1234567") is False
+
+    def http_400(url):
+        raise urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", http_400)
+    assert arxiv_mod.atom_has_entry("FOOBAR/1234567") is False
+
+    def down(url):
+        raise urllib.error.URLError("down")
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", down)
+    assert arxiv_mod.atom_has_entry("2301.12345") is None
+
+
+def test_atom_has_entry_qualified_legacy_id_normalized(monkeypatch):
+    """Atom's id_list only knows bare-archive legacy ids (math.GT/0309136 → math/0309136)."""
+    seen: list[str] = []
+
+    def read(url):
+        seen.append(url)
+        return ATOM_OK, "application/atom+xml"
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", read)
+    assert arxiv_mod.atom_has_entry("math.GT/0309136") is True
+    assert seen == ["https://export.arxiv.org/api/query?id_list=math/0309136"]
+
+
+def test_unknown_archive_id_is_invalid_400(monkeypatch):
+    """BUG3: archive-shaped ids arXiv does not know → 400 invalid_id, not 200-with-fake-title."""
+    client = TestClient(api.app, raise_server_exceptions=False)
+
+    def fake_read(url):
+        if "api/query" in url:
+            return ATOM_EMPTY, "application/atom+xml"
+        raise urllib.error.URLError("404")
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", fake_read)
+    for bad in ("foo-bar/1234567", "FOOBAR/1234567", "https://arxiv.org/abs/foo-bar/1234567"):
+        r = client.get("/api/arxiv", params={"url": bad})
+        assert r.status_code == 400, (bad, r.text)
+        assert r.json() == {"detail": "invalid_id"}
+
+    r = client.post("/api/extract", json={"source": "arxiv_url", "value": "foo-bar/1234567"})
+    assert r.status_code == 400
+    assert r.json() == {"detail": "invalid_id"}
+    assert "arxiv:foo-bar/1234567" not in api._cache  # failure never cached
+
+
+def test_unknown_archive_id_arxiv_http400_is_invalid(monkeypatch):
+    """Live arXiv answers unknown ids with HTTP 400 — same invalid_id verdict."""
+    client = TestClient(api.app, raise_server_exceptions=False)
+
+    def fake_read(url):
+        if "api/query" in url:
+            raise urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(b""))
+        raise urllib.error.URLError("404")
+
+    monkeypatch.setattr(arxiv_mod, "_read_url", fake_read)
+    r = client.get("/api/arxiv", params={"url": "FOOBAR/1234567"})
+    assert r.status_code == 400
+    assert r.json() == {"detail": "invalid_id"}

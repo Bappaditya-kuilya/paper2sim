@@ -132,14 +132,28 @@ def _line_has_math(line: str) -> bool:
     """Check if a line of text contains mathematical notation."""
     # Trailing unescaped `%...` is a LaTeX comment: strip before every test.
     line = re.sub(r"(?<!\\)%.*", "", line)
-    # Greek letters or math symbols (complete blocks: lowercase + ς/ο/υ, capitals; ⌊⌋⌈⌉, U+2212).
+    # Greek letters or math symbols (complete blocks: lowercase + ς/ο/υ, capitals; ⌊⌋⌈⌉, U+2212; Latin-1 math · ² ³).
     if re.search(r"[αβγδεζηθικλμνξοπρςστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ]", line):
         return True
-    if re.search(r"[∑∫∏∂∇√∞≈≤≥≠±×÷⌊⌋⌈⌉−]", line):
+    if re.search(r"[∑∫∏∂∇√∞≈≤≥≠±×÷⌊⌋⌈⌉−·²³]", line):
         return True
     # Lines with = and at least one operator-class char (glued bare forms
     # like `2x` carry their operator from `=`-side context, `|`/`_` included).
     if "=" in line and re.search(r"[+\-*/^√∑∫|_−]", line):
+        return True
+    # Bare single-identifier assignment (y = x, f = x): no operator, but a
+    # closed form. Full-line anchored so digits/spaces (`speed = 100 mph`)
+    # and sentences stay prose.
+    # ponytail: `n = total` now passes and classifies `equation` (not
+    # plottable); the UI renders the per-row not-plottable reason instead.
+    if re.search(r"^\s*[A-Za-z]\w*\s*=\s*[A-Za-z]\w*\s*$", line):
+        return True
+    # ASCII inequalities reach classify_equation: `<=`/`>=` are unambiguous
+    # tokens; bare `<`/`>` also need digit/operator context and no markup tag,
+    # so `y < x + 1` extracts while `<html>` / `for i < n; print` stay prose.
+    if re.search(r"<=|>=", line):
+        return True
+    if re.search(r"[<>]", line) and re.search(r"[+\-*/^√∑∫|_−\d]", line) and not re.search(r"</?[A-Za-z][^<>]*>", line):
         return True
     # Bare function calls carry no operator (y=sin(x), f(x)=x): mirror
     # classify_equation's function rules so functions reach the plot path.
@@ -178,10 +192,16 @@ def is_plottable_candidate(line: str) -> bool:
 # like "α + β = γ". Only non-ASCII OUTSIDE these ranges (mojibake from
 # corrupted PDF bytes, e.g. CJK/private-use soup) counts toward the ratio.
 _MATH_UNICODE_RANGES = (
+    (0x00B1, 0x00B1),  # ± plus-minus
+    (0x00B2, 0x00B2),  # ²
+    (0x00B3, 0x00B3),  # ³
+    (0x00B7, 0x00B7),  # ·
+    (0x00D7, 0x00D7),  # ×
+    (0x00F7, 0x00F7),  # ÷
     (0x0370, 0x03FF),  # Greek and Coptic
     (0x1F00, 0x1FFF),  # Greek Extended
     (0x2190, 0x21FF),  # Arrows
-    (0x2200, 0x22FF),  # Mathematical Operators
+    (0x2200, 0x22FF),  # Mathematical Operators (incl. − U+2212)
     (0x2300, 0x23FF),  # Miscellaneous Technical
 )
 
