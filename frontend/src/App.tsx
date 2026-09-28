@@ -172,7 +172,8 @@ export default function App() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, latex } : r)));
     // Re-derive on edit: rowTypes is backend-only, so the badge/hint go stale.
     // ponytail: client classifier can drift from the backend label; upgrade path: refetch the type on blur.
-    setRowTypes((prev) => ({ ...prev, [id]: classifyExpression(latex) }));
+    const type = isInequalityLatex(latex) ? 'inequality' : classifyExpression(latex);
+    setRowTypes((prev) => ({ ...prev, [id]: type }));
   }, []);
 
   const handleParamSliders = useCallback((id: string, patch: Row['params']) => {

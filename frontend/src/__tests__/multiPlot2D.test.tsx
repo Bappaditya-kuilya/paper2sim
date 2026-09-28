@@ -40,7 +40,7 @@ describe('MultiPlot2D extracted-equation shapes', () => {
 
   test('inequality rows stay on the region path', () => {
     plotFor('x^2 + y^2 <= 4');
-    screen.getByRole('img', { name: 'No visible plots' });
+    expect(screen.queryByRole('img', { name: 'No visible plots' })).toBeNull();
     expect(screen.queryByText(/unknown LaTeX command/)).toBeNull();
   });
 
