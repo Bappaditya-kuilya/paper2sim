@@ -36,10 +36,14 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
 
   const paths: Array<{ id: string; color: string; d: string }> = [];
   const reasons: Array<{ id: string; msg: string }> = [];
+  let ineqRows = 0;
   for (const row of rows) {
     if (!row.visible) continue;
     // Regions stay App's job; matrices never compile — skip both silently.
-    if (isInequalityLatex(row.latex)) continue;
+    if (isInequalityLatex(row.latex)) {
+      ineqRows += 1;
+      continue;
+    }
     // Equation envs unwrap (a scalar equation is not a matrix); matrix envs keep the silent skip.
     const latex = unwrapEquationEnvs(row.latex);
     if (latex.includes('\\begin')) continue;
@@ -85,6 +89,9 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
   }
 
   if (paths.length === 0) {
+    // Inequalities are rendered by App's region panel, which explains itself —
+    // a blank "No visible plots" box would only repeat it.
+    if (reasons.length === 0 && ineqRows > 0) return null;
     // ponytail: first 3 distinct reasons, not one per row — upgrade path: per-row list keyed by label.
     const shown = [...new Set(reasons.map((r) => r.msg))].slice(0, 3);
     return (

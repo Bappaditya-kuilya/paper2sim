@@ -38,7 +38,7 @@ describe('App inline edit type refresh', () => {
     expect(within(section).getByText('raise k to pack waves tighter')).toBeDefined();
 
     const input = screen.getAllByRole('textbox', { name: 'Equation' })[0] as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'y < (x - 15)' } });
+    fireEvent.change(input, { target: { value: 'y = (x - 15)' } });
     fireEvent.blur(input);
 
     section = screen.getByRole('region', { name: 'Selected equation' });
@@ -46,6 +46,22 @@ describe('App inline edit type refresh', () => {
     expect(within(section).getByText('function')).toBeDefined();
     expect(within(section).queryByText('raise k to pack waves tighter')).toBeNull();
     expect(within(section).getByText('change a number to shift the curve')).toBeDefined();
+  });
+
+  test('editing a row to an inequality sets the inequality badge', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    let section = await screen.findByRole('region', { name: 'Selected equation' });
+    expect(within(section).getByText('trigonometric')).toBeDefined();
+
+    const input = screen.getAllByRole('textbox', { name: 'Equation' })[0] as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'y < (x - 15)' } });
+    fireEvent.blur(input);
+
+    section = screen.getByRole('region', { name: 'Selected equation' });
+    expect(within(section).queryByText('trigonometric')).toBeNull();
+    expect(within(section).getByText('inequality')).toBeDefined();
+    expect(within(section).getByText('no tuning available for this type')).toBeDefined();
   });
 });
 
