@@ -49,6 +49,33 @@ describe('MultiPlot2D extracted-equation shapes', () => {
     const panel = screen.getByRole('img', { name: 'No visible plots' });
     expect(panel.querySelectorAll('p').length).toBeGreaterThan(1);
   });
+
+  test('y exploding mid-range still plots the visible portion with finite path data', () => {
+    plotFor('y = e^(x^2)');
+    const plot = screen.getByRole('img', { name: '1 plot' });
+    const d = plot.querySelector('path')?.getAttribute('d') ?? '';
+    expect(d).toMatch(/^M-?[\d.]+,-?[\d.]+/);
+    expect(d).not.toMatch(/NaN|Infinity|e\+/);
+    const nums = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    let inside = 0;
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      if (nums[i] > 44 && nums[i] < 588 && nums[i + 1] > 12 && nums[i + 1] < 288) inside++;
+    }
+    expect(inside).toBeGreaterThan(10);
+  });
+
+  test('a failing row shows its reason while the good row still plots', () => {
+    render(
+      <MultiPlot2D
+        rows={[newRow('lrate = \\dmodel^{-0.5}', '#00FF00'), newRow('y = x^2', '#FFFFFF')]}
+        viewport={DEFAULT_VIEWPORT}
+      />,
+    );
+    const plot = screen.getByRole('img', { name: '1 plot' });
+    const d = plot.querySelector('path')?.getAttribute('d') ?? '';
+    expect(d).toMatch(/^M-?[\d.]+,-?[\d.]+/);
+    screen.getByText('card: unknown LaTeX command \\dmodel');
+  });
 });
 
 describe('unwrapEquationEnvs', () => {

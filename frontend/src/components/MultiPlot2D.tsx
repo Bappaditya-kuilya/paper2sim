@@ -35,7 +35,7 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
   const yToPx = (y: number): number => PAD_T + (1 - (y - y0) / ySpan) * innerH;
 
   const paths: Array<{ id: string; color: string; d: string }> = [];
-  const reasons: string[] = [];
+  const reasons: Array<{ id: string; msg: string }> = [];
   for (const row of rows) {
     if (!row.visible) continue;
     // Regions stay App's job; matrices never compile — skip both silently.
@@ -49,11 +49,11 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
     try {
       pts = sampleRow(latex, viewport.x, scope, 200);
     } catch (e) {
-      reasons.push(e instanceof Error ? e.message : String(e));
+      reasons.push({ id: row.id, msg: e instanceof Error ? e.message : String(e) });
       continue;
     }
     if (!pts.some(([, y]) => Number.isFinite(y))) {
-      reasons.push(`no finite points on x∈[${fmt(x0)},${fmt(x1)}]`);
+      reasons.push({ id: row.id, msg: `no finite points on x∈[${fmt(x0)},${fmt(x1)}]` });
       continue;
     }
     let d = '';
@@ -64,9 +64,20 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
         prevFinite = false;
         continue;
       }
+      const px = xToPx(xv);
+      const py = yToPx(yv);
+      if (Number.isNaN(px) || Number.isNaN(py)) {
+        prevFinite = false;
+        continue;
+      }
+      // Clamp into the plot rect: keeps toFixed(2) out of exponential notation
+      // (|px| >= 1e21 → "e+…" breaks Chromium's path parser) and Infinity/NaN
+      // out of `d`, which makes Chromium discard the whole path.
+      const cx = Math.min(VIEW_W - PAD_R, Math.max(PAD_L, px));
+      const cy = Math.min(h - PAD_B, Math.max(PAD_T, py));
       // ponytail: same pole rule as Plot2D — jump >50% of y-span = new subpath.
       const jump = prevFinite && Math.abs(yv - prevY) > ySpan * 0.5;
-      d += `${prevFinite && !jump ? 'L' : 'M'}${xToPx(xv).toFixed(2)},${yToPx(yv).toFixed(2)} `;
+      d += `${prevFinite && !jump ? 'L' : 'M'}${cx.toFixed(2)},${cy.toFixed(2)} `;
       prevFinite = true;
       prevY = yv;
     }
@@ -75,7 +86,7 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
 
   if (paths.length === 0) {
     // ponytail: first 3 distinct reasons, not one per row — upgrade path: per-row list keyed by label.
-    const shown = [...new Set(reasons)].slice(0, 3);
+    const shown = [...new Set(reasons.map((r) => r.msg))].slice(0, 3);
     return (
       <div
         role="img"
@@ -142,6 +153,9 @@ export function MultiPlot2D({ rows, viewport, height = 320 }: MultiPlot2DProps) 
         <text x={VIEW_W - PAD_R} y={h - 6} textAnchor="end" fontSize={11} fill="#a1a1aa">x</text>
         <text x={12} y={PAD_T + 4} textAnchor="start" fontSize={11} fill="#a1a1aa">y</text>
       </svg>
+      {reasons.map((r) => (
+        <p key={r.id} className="mt-1 text-xs text-zinc-400">{r.msg}</p>
+      ))}
     </div>
   );
 }

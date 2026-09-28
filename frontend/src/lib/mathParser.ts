@@ -392,12 +392,15 @@ export function stripLatex(input: string): string {
     if (cmd === 'ln') return cmd;
     return m;
   });
-  // L2: typography macros unwrap to their braced group (a font/markup choice
-  // never changes the math); begin/end stay so environments card instead of
-  // becoming a stray word. Bare unknowns card below — never vanish, never
-  // invent a value for \dmodel.
-  s = s.replace(/\\([A-Za-z][A-Za-z0-9]*)\s*\{([A-Za-z0-9]+)\}/g, (m, cmd: string, grp: string) =>
-    cmd === 'begin' || cmd === 'end' ? m : grp,
+  // L2: explicit typography-only whitelist unwraps to its braced group (a
+  // font/markup choice never changes the math). Every other \cmd{...} stays
+  // for the unknown-command card below — never vanish, never invent a value
+  // for \dmodel{1} or \binom{2}{3}. begin/end are not on the list, so
+  // environments card instead of becoming a stray word.
+  // ponytail: single-level [^{}]*, one left-to-right pass — a whitelist macro nested inside another braced group (\textbf{\boxed{x}}) never unwraps and cards as unknown; upgrade path: balanced-brace scan.
+  s = s.replace(
+    /\\(?:textbf|texttt|operatorname|displaystyle|boxed|text|mathrm|limits|mathcal|ve)\s*\{([^{}]*)\}/g,
+    '$1',
   );
   // L2: shredder deleted — unknown commands card with reason, never vanish.
   const unknown = s.match(/\\[A-Za-z][A-Za-z0-9]*/);

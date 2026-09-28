@@ -53,6 +53,17 @@ describe('stripLatex', () => {
     expect(() => stripLatex('\\dmodel^{-0.5}')).toThrow('card: unknown LaTeX command \\dmodel');
     expect(() => stripLatex('\\begin{bmatrix} 1 \\end{bmatrix}')).toThrow(/unknown LaTeX command/);
   });
+
+  test('typography whitelist unwraps, semantic commands still card', () => {
+    expect(stripLatex('\\boxed{E=mc^2}')).toBe('E=mc^(2)');
+    expect(() => normalizeInput('\\boxed{E=mc^2}')).not.toThrow();
+    expect(() => normalizeInput('\\mathrm{d}x = y \\, \\mathrm{d}t')).not.toThrow();
+    expect(stripLatex('\\begin{align} y = x \\end{align}')).toBe('y = x');
+    expect(() => stripLatex('lrate = \\dmodel{1}')).toThrow('card: unknown LaTeX command \\dmodel');
+    expect(() => normalizeInput('lrate = \\dmodel{1}')).toThrow('card: unknown LaTeX command \\dmodel');
+    expect(() => stripLatex('\\binom{2}{3}')).toThrow('card: unknown LaTeX command \\binom');
+    expect(() => stripLatex('\\color{red}x')).toThrow('card: unknown LaTeX command \\color');
+  });
 });
 
 describe('addImplicitMultiply', () => {
